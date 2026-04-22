@@ -4,29 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="900ede8d-4bf2-4552-badd-6108bc406569" name="Changes" comment="landing page">
+    <list default="true" id="900ede8d-4bf2-4552-badd-6108bc406569" name="Changes" comment="donor registration page">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/AdminDashboard.jsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/App.jsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/Chatbot.jsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/DonorPortal.jsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/EligibilityChecker.jsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/Footer.jsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/Hero.jsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/Home.jsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/HospitalPortal.jsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/ModulesSection.jsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/Navbar.jsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/index.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/index.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/main.jsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/package.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/postcss.config.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/tailwind.config.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/tokens.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/vite.config.js" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/App.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/App.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/components/home/Hero.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/home/Hero.jsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -93,11 +73,20 @@
       <option name="project" value="LOCAL" />
       <updated>1776835856624</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="donor registration page">
+      <option name="closed" value="true" />
+      <created>1776838649617</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1776838649617</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="landing page" />
-    <option name="LAST_COMMIT_MESSAGE" value="landing page" />
+    <MESSAGE value="donor registration page" />
+    <option name="LAST_COMMIT_MESSAGE" value="donor registration page" />
   </component>
 </project>

@@ -147,7 +147,7 @@ export default function DonorPortal() {
               <h4 className="font-serif text-[0.95rem]">Blood credit progress</h4>
               <span className="text-[0.72rem] font-medium px-2.5 py-0.5 rounded-full bg-[#E6EFFF] text-bb-blue">Gold tier</span>
             </div>
-            <div className="grid grid-cols-4 gap-3 mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               {TIERS.map(({ label, mark, req, current, achieved }) => (
                 <div key={label} className={`text-center p-3 rounded-bb-sm ${current ? 'bg-[#FFF4E0] border-[1.5px] border-bb-amber' : achieved ? 'bg-bb-cream border border-bb-ink-10' : 'bg-bb-ink-10 border border-bb-ink-10'}`}>
                   <div className={`text-[0.7rem] mb-1 ${current ? 'text-bb-amber font-medium' : 'text-bb-ink-60'}`}>{current ? `${label} ← You` : label}</div>

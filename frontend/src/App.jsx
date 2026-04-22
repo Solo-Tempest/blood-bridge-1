@@ -11,6 +11,7 @@ import EligibilityChecker from './pages/EligibilityChecker';
 import Chatbot          from './pages/Chatbot';
 import AdminDashboard   from './pages/AdminDashboard';
 import DonorRegistration from './pages/DonorRegistration';
+import DonorLogin        from './pages/DonorLogin';
 
 function Layout() {
   return (
@@ -25,6 +26,7 @@ function Layout() {
           <Route path="/chatbot"     element={<Chatbot />}           />
           <Route path="/admin"       element={<AdminDashboard />}    />
           <Route path="/donor-register" element={<DonorRegistration />} />
+          <Route path="/donor-login"    element={<DonorLogin />}        />
         </Routes>
       </main>
       <Footer />

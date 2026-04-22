@@ -29,12 +29,12 @@ const INV_UNIT = {
 export default function HospitalPortal() {
   return (
     <div className="min-h-screen bg-bb-cream">
-      <div className="bg-bb-ink text-white px-4 md:px-12 py-4 mt-[60px] flex items-center gap-5">
+      <div className="bg-bb-ink text-white px-4 md:px-12 py-4 mt-[60px] flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5">
         <div>
           <h3 className="font-serif text-[1.1rem] text-white">Hospital Command Portal</h3>
           <p className="text-[0.82rem] text-bb-ink-30">Bokaro General Hospital · Blood Bank Unit · Last sync 2 min ago</p>
         </div>
-        <button className="ml-auto bg-bb-red text-white border-none cursor-pointer px-6 py-2.5 rounded-bb text-[0.9rem] font-medium flex items-center gap-2 hover:bg-bb-red-dark transition-colors">
+        <button className="sm:ml-auto bg-bb-red text-white border-none cursor-pointer px-6 py-2.5 rounded-bb text-[0.9rem] font-medium flex items-center justify-center gap-2 hover:bg-bb-red-dark transition-colors w-full sm:w-auto">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
           New Emergency Request
         </button>

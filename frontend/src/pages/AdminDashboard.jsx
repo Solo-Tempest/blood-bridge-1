@@ -21,14 +21,14 @@ export default function AdminDashboard() {
       <div className="max-w-[1200px] mx-auto">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-7">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-7">
           <div>
             <h2 className="font-serif text-[1.8rem]">Analytics Dashboard</h2>
             <p className="text-bb-ink-60 text-[0.88rem]">Blood Bridge · System overview · Live</p>
           </div>
-          <div className="flex bg-bb-ink-10 rounded-bb p-1 gap-0">
+          <div className="flex bg-bb-ink-10 rounded-bb p-1 gap-0 w-full sm:w-auto">
             {['Overview', 'Forecasting', 'Model Health'].map((t, i) => (
-              <button key={t} className={`px-4 py-2 rounded-bb-sm text-[0.85rem] border-none cursor-pointer font-sans transition-all ${i === 0 ? 'bg-white text-bb-ink font-medium shadow-sm' : 'bg-transparent text-bb-ink-60 hover:text-bb-ink'}`}>
+              <button key={t} className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-bb-sm text-[0.82rem] sm:text-[0.85rem] border-none cursor-pointer font-sans transition-all ${i === 0 ? 'bg-white text-bb-ink font-medium shadow-sm' : 'bg-transparent text-bb-ink-60 hover:text-bb-ink'}`}>
                 {t}
               </button>
             ))}

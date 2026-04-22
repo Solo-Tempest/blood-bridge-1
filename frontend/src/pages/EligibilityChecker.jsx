@@ -57,7 +57,7 @@ export default function EligibilityChecker() {
             Fill in your health details. Our AI will predict your eligibility and explain the key factors.
           </p>
           <div className="bg-white rounded-bb-lg border border-bb-ink-10 p-8">
-            <div className="grid grid-cols-2 gap-3.5 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-4">
               <div>
                 <label className="block text-[0.82rem] font-medium mb-1.5">Age (years)</label>
                 <input className={inputCls} type="number" placeholder="e.g. 28" value={form.age} onChange={set('age')} />
@@ -67,7 +67,7 @@ export default function EligibilityChecker() {
                 <input className={inputCls} type="number" placeholder="e.g. 65" value={form.weight} onChange={set('weight')} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3.5 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-4">
               <div>
                 <label className="block text-[0.82rem] font-medium mb-1.5">Hemoglobin (g/dL)</label>
                 <input className={inputCls} type="number" step="0.1" placeholder="e.g. 13.5" value={form.hb} onChange={set('hb')} />
@@ -79,7 +79,7 @@ export default function EligibilityChecker() {
                 <p className="text-[0.75rem] text-bb-ink-60 mt-1">Safe range: 90–160</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3.5 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-4">
               <div>
                 <label className="block text-[0.82rem] font-medium mb-1.5">Blood group</label>
                 <select className={inputCls} value={form.bg} onChange={set('bg')}>
