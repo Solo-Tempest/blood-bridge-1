@@ -1,0 +1,68 @@
+/* ── Google Fonts ─────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base resets ─────────────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background-color: #FAF7F2; /* bb-cream */
+    color: #0E0C0D;            /* bb-ink */
+    overflow-x: hidden;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'DM Serif Display', serif;
+    line-height: 1.15;
+  }
+
+  h1 { font-size: clamp(2.4rem, 5vw, 4rem); }
+  h2 { font-size: clamp(1.8rem, 3vw, 2.6rem); }
+  h3 { font-size: 1.3rem; }
+  h4 { font-size: 1.05rem; }
+}
+
+/* ── Reusable utility layer ──────────────────────────────────────────────── */
+@layer utilities {
+  /* Mono label */
+  .mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8em;
+  }
+
+  /* Section eyebrow line decoration */
+  .eyebrow-line::before {
+    content: '';
+    display: inline-block;
+    width: 28px;
+    height: 1px;
+    background: #C8102E;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+
+  /* Animated hero blood ring */
+  .hero-ring {
+    animation: rotate 30s linear infinite;
+  }
+
+  /* Counter-rotate orbit dots so they stay upright */
+  .orbit-label {
+    animation: counterRotate 30s linear infinite;
+  }
+}
