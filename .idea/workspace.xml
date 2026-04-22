@@ -4,7 +4,30 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="900ede8d-4bf2-4552-badd-6108bc406569" name="Changes" comment="" />
+    <list default="true" id="900ede8d-4bf2-4552-badd-6108bc406569" name="Changes" comment="landing page">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/AdminDashboard.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/App.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/Chatbot.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/DonorPortal.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/EligibilityChecker.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/Footer.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/Hero.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/Home.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/HospitalPortal.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/ModulesSection.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/Navbar.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/index.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/main.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/postcss.config.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/tailwind.config.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/tokens.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/vite.config.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/App.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/App.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/components/home/Hero.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/home/Hero.jsx" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -12,6 +35,22 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;Solo-Tempest&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/Solo-Tempest/blood-bridge-1.git&quot;,
+    &quot;accountId&quot;: &quot;5e688c6d-7fb5-4a5b-a385-d7de2f4d867e&quot;
+  }
+}</component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
   </component>
   <component name="ProjectColorInfo">{
   &quot;customColor&quot;: &quot;&quot;,
@@ -28,6 +67,7 @@
     "RunOnceActivity.MCP Project settings loaded": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
     "git-widget-placeholder": "master",
     "ignore.virus.scanning.warn.message": "true",
@@ -45,6 +85,19 @@
       <option name="presentableId" value="Default" />
       <updated>1776757038759</updated>
     </task>
+    <task id="LOCAL-00001" summary="landing page">
+      <option name="closed" value="true" />
+      <created>1776835856624</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1776835856624</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="landing page" />
+    <option name="LAST_COMMIT_MESSAGE" value="landing page" />
   </component>
 </project>

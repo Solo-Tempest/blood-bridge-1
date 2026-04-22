@@ -10,6 +10,7 @@ import HospitalPortal   from './pages/HospitalPortal';
 import EligibilityChecker from './pages/EligibilityChecker';
 import Chatbot          from './pages/Chatbot';
 import AdminDashboard   from './pages/AdminDashboard';
+import DonorRegistration from './pages/DonorRegistration';
 
 function Layout() {
   return (
@@ -23,6 +24,7 @@ function Layout() {
           <Route path="/eligibility" element={<EligibilityChecker />}/>
           <Route path="/chatbot"     element={<Chatbot />}           />
           <Route path="/admin"       element={<AdminDashboard />}    />
+          <Route path="/donor-register" element={<DonorRegistration />} />
         </Routes>
       </main>
       <Footer />

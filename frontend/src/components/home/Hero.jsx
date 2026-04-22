@@ -43,7 +43,7 @@ export default function Hero() {
 
         <div className="flex gap-3 flex-wrap">
           <Link
-            to="/eligibility"
+            to="/donor-register"
             className="
               inline-flex items-center gap-2
               bg-bb-red text-white
