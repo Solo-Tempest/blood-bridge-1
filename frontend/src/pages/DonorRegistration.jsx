@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { Link } from "react-router-dom";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const GENDERS = ["Male", "Female", "Other", "Prefer not to say"];
@@ -652,11 +653,13 @@ export default function DonorRegistration() {
             )}
           </div>
 
-          <p className="text-center text-xs text-gray-400 mt-5">
-            By registering, you agree to our{" "}
-            <span className="text-red-500 cursor-pointer hover:underline">Terms of Service</span>{" "}
-            &amp;{" "}
-            <span className="text-red-500 cursor-pointer hover:underline">Privacy Policy</span>
+          <p className="text-center text-[11px] text-gray-400 mt-4">
+            Already registered?{" "}
+            <Link to="/donor-login" className="text-red-500 font-semibold hover:underline">Login here →</Link>
+            &nbsp;·&nbsp;
+            <span className="cursor-pointer hover:text-red-400 transition-colors">Terms</span>
+            &nbsp;·&nbsp;
+            <span className="cursor-pointer hover:text-red-400 transition-colors">Privacy</span>
           </p>
         </div>
       </div>
