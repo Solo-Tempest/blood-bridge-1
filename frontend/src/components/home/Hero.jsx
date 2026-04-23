@@ -59,7 +59,7 @@ export default function Hero() {
             Donor Register
           </Link>
           <Link
-            to="/hospital"
+            to="/hospital-register"
             className="
               inline-flex items-center gap-2
               bg-transparent text-bb-ink

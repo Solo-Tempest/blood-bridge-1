@@ -12,6 +12,8 @@ import Chatbot          from './pages/Chatbot';
 import AdminDashboard   from './pages/AdminDashboard';
 import DonorRegistration from './pages/DonorRegistration';
 import DonorLogin        from './pages/DonorLogin';
+import HospitalRegistration from './pages/HospitalRegistration';
+import HospitalLogin        from './pages/HospitalLogin';
 
 function Layout() {
   return (
@@ -27,6 +29,8 @@ function Layout() {
           <Route path="/admin"       element={<AdminDashboard />}    />
           <Route path="/donor-register" element={<DonorRegistration />} />
           <Route path="/donor-login"    element={<DonorLogin />}        />
+          <Route path="/hospital-register" element={<HospitalRegistration />} />
+          <Route path="/hospital-login"    element={<HospitalLogin />}        />
         </Routes>
       </main>
       <Footer />

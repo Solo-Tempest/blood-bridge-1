@@ -4,9 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="900ede8d-4bf2-4552-badd-6108bc406569" name="Changes" comment="donor registration page">
+    <list default="true" id="900ede8d-4bf2-4552-badd-6108bc406569" name="Changes" comment="donor login page and make it responsive">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/App.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/App.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/components/home/Hero.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/home/Hero.jsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -81,12 +82,21 @@
       <option name="project" value="LOCAL" />
       <updated>1776838649617</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="donor login page and make it responsive">
+      <option name="closed" value="true" />
+      <created>1776842345939</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1776842345939</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="landing page" />
     <MESSAGE value="donor registration page" />
-    <option name="LAST_COMMIT_MESSAGE" value="donor registration page" />
+    <MESSAGE value="donor login page and make it responsive" />
+    <option name="LAST_COMMIT_MESSAGE" value="donor login page and make it responsive" />
   </component>
 </project>
