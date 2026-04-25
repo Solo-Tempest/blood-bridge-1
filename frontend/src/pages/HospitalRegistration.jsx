@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { hospitalRegister } from "../api/auth";
 
 /* ── Google Fonts ── */
 const GlobalStyles = () => (
@@ -716,15 +717,27 @@ export default function HospitalRegistration() {
   };
   const back = () => { setErrors({}); setStep(s => s-1); };
 
-  const submit = () => {
+  const [apiError, setApiError] = useState("");
+
+  const submit = async () => {
     setLoading(true);
-    setTimeout(() => { setLoading(false); setSuccess(true); }, 2200);
+    setApiError("");
+    try {
+      const data = await hospitalRegister({ basic, location, contact, facilities, account, docs });
+      localStorage.setItem("bb_token", data.token);
+      localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
+      setSuccess(true);
+    } catch (err) {
+      setApiError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* success */
   useEffect(() => {
     if (!success) return;
-    const t = setTimeout(() => navigate("/hospital"), 2600);
+    const t = setTimeout(() => navigate("/hospital-dashboard"), 2600);
     return () => clearTimeout(t);
   }, [success]);
 
@@ -796,7 +809,12 @@ export default function HospitalRegistration() {
               </div>
 
               {/* nav */}
-              <div className="flex gap-3 mt-7 pt-5 border-t border-rose-50">
+              {apiError && step === 7 && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 font-medium mt-4">
+                  ⚠ {apiError}
+                </p>
+              )}
+              <div className="flex gap-3 mt-4 pt-5 border-t border-rose-50">
                 {step>1 && <GhostBtn onClick={back}>← Back</GhostBtn>}
                 <div className="flex-1" />
                 {step<7
@@ -810,7 +828,7 @@ export default function HospitalRegistration() {
           </div>
 
           <p className="text-center text-[11px] text-gray-400 mt-4">
-            Already registered? <a href="#" className="text-red-500 font-semibold hover:underline">Login here →</a>
+            Already registered? <a href="/hospital-login" className="text-red-500 font-semibold hover:underline">Login here →</a>
             &nbsp;·&nbsp;
             <a href="#" className="hover:text-red-400 transition-colors">Terms</a>
             &nbsp;·&nbsp;

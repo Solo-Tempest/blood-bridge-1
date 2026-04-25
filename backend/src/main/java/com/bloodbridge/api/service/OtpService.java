@@ -3,9 +3,12 @@ package com.bloodbridge.api.service;
 import com.bloodbridge.api.dto.auth.AuthResponse;
 import com.bloodbridge.api.dto.auth.OtpSendResponse;
 import com.bloodbridge.api.entity.Donor;
+import com.bloodbridge.api.entity.Hospital;
 import com.bloodbridge.api.entity.User;
+import com.bloodbridge.api.entity.enums.Role;
 import com.bloodbridge.api.exception.ApiException;
 import com.bloodbridge.api.repository.DonorRepository;
+import com.bloodbridge.api.repository.HospitalRepository;
 import com.bloodbridge.api.repository.UserRepository;
 import com.bloodbridge.api.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +25,7 @@ public class OtpService {
 
     private final UserRepository userRepository;
     private final DonorRepository donorRepository;
+    private final HospitalRepository hospitalRepository;
     private final JwtUtil jwtUtil;
 
     private final ConcurrentHashMap<String, OtpEntry> otpStore = new ConcurrentHashMap<>();
@@ -61,9 +65,12 @@ public class OtpService {
 
         String token = jwtUtil.generateToken(user);
 
-        String fullName = donorRepository.findByUser(user)
-                .map(Donor::getFullName)
-                .orElse(null);
+        String fullName;
+        if (user.getRole() == Role.HOSPITAL) {
+            fullName = hospitalRepository.findByUser(user).map(Hospital::getName).orElse(null);
+        } else {
+            fullName = donorRepository.findByUser(user).map(Donor::getFullName).orElse(null);
+        }
 
         return AuthResponse.builder()
                 .token(token)

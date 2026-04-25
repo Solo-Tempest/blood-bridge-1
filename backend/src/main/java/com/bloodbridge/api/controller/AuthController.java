@@ -17,6 +17,8 @@ public class AuthController {
     private final AuthService authService;
     private final OtpService otpService;
 
+    /* ── Donor ── */
+
     @PostMapping("/donor/register")
     public ResponseEntity<AuthResponse> donorRegister(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
@@ -28,12 +30,34 @@ public class AuthController {
     }
 
     @PostMapping("/donor/otp/send")
-    public ResponseEntity<OtpSendResponse> sendOtp(@Valid @RequestBody OtpSendRequest request) {
+    public ResponseEntity<OtpSendResponse> donorSendOtp(@Valid @RequestBody OtpSendRequest request) {
         return ResponseEntity.ok(otpService.sendOtp(request.getPhone()));
     }
 
     @PostMapping("/donor/otp/verify")
-    public ResponseEntity<AuthResponse> verifyOtp(@Valid @RequestBody OtpVerifyRequest request) {
+    public ResponseEntity<AuthResponse> donorVerifyOtp(@Valid @RequestBody OtpVerifyRequest request) {
+        return ResponseEntity.ok(otpService.verifyOtp(request.getPhone(), request.getOtp()));
+    }
+
+    /* ── Hospital ── */
+
+    @PostMapping("/hospital/register")
+    public ResponseEntity<AuthResponse> hospitalRegister(@Valid @RequestBody HospitalRegisterRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(authService.hospitalRegister(request));
+    }
+
+    @PostMapping("/hospital/login")
+    public ResponseEntity<AuthResponse> hospitalLogin(@Valid @RequestBody LoginRequest request) {
+        return ResponseEntity.ok(authService.login(request));
+    }
+
+    @PostMapping("/hospital/otp/send")
+    public ResponseEntity<OtpSendResponse> hospitalSendOtp(@Valid @RequestBody OtpSendRequest request) {
+        return ResponseEntity.ok(otpService.sendOtp(request.getPhone()));
+    }
+
+    @PostMapping("/hospital/otp/verify")
+    public ResponseEntity<AuthResponse> hospitalVerifyOtp(@Valid @RequestBody OtpVerifyRequest request) {
         return ResponseEntity.ok(otpService.verifyOtp(request.getPhone(), request.getOtp()));
     }
 }

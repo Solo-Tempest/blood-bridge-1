@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { hospitalLogin, sendHospitalOtp, verifyHospitalOtp } from "../api/auth";
 
 /* ─── Global Styles ───────────────────────────────────────────────────── */
 const GlobalStyles = () => (
@@ -156,22 +157,25 @@ function Divider({ label }) {
 
 /* ─── Main Component ──────────────────────────────────────────────────── */
 export default function HospitalLogin() {
-  const [mode,       setMode]       = useState("password"); // "password" | "otp"
+  const navigate = useNavigate();
+  const [mode,       setMode]       = useState("password");
   const [identifier, setIdentifier] = useState("");
   const [password,   setPassword]   = useState("");
   const [showPw,     setShowPw]     = useState(false);
   const [remember,   setRemember]   = useState(false);
   const [errors,     setErrors]     = useState({});
   const [loading,    setLoading]    = useState(false);
+  const [apiError,   setApiError]   = useState("");
   const [success,    setSuccess]    = useState(false);
   const [cardIn,     setCardIn]     = useState(false);
 
   // OTP mode
-  const [phone,      setPhone]      = useState("");
-  const [otpSent,    setOtpSent]    = useState(false);
-  const [otp,        setOtp]        = useState("");
-  const [resend,     setResend]     = useState(0);
-  const [otpError,   setOtpError]   = useState("");
+  const [phone,        setPhone]        = useState("");
+  const [otpSent,      setOtpSent]      = useState(false);
+  const [otp,          setOtp]          = useState("");
+  const [receivedOtp,  setReceivedOtp]  = useState("");
+  const [resend,       setResend]       = useState(0);
+  const [otpError,     setOtpError]     = useState("");
 
   useEffect(() => { requestAnimationFrame(() => setCardIn(true)); }, []);
 
@@ -182,7 +186,15 @@ export default function HospitalLogin() {
     return () => clearTimeout(t);
   }, [resend]);
 
-  const startResend = () => { setResend(30); setOtp(""); setOtpError(""); };
+  async function startResend() {
+    setOtp(""); setOtpError(""); setResend(30);
+    try {
+      const data = await sendHospitalOtp(phone);
+      setReceivedOtp(data.otp);
+    } catch (err) {
+      setOtpError(err.message);
+    }
+  }
 
   /* identifier icon */
   const idIcon = isPhone(identifier) ? <IcoPhone /> : <IcoMail />;
@@ -211,27 +223,62 @@ export default function HospitalLogin() {
   }
 
   /* handlers */
-  function handleSendOtp() {
+  async function handleSendOtp() {
     if (!validateOtpPhone()) return;
     setLoading(true);
-    setTimeout(() => { setOtpSent(true); setResend(30); setLoading(false); }, 1200);
+    setApiError("");
+    try {
+      const data = await sendHospitalOtp(phone);
+      setReceivedOtp(data.otp);
+      setOtpSent(true);
+      setResend(30);
+    } catch (err) {
+      setApiError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (mode === "otp" && otpSent) {
       if (otp.length !== 6) { setOtpError("Enter the 6-digit OTP"); return; }
-      if (otp !== "123456") { setOtpError("Invalid OTP. Try 123456 for demo."); return; }
       setLoading(true);
-      setTimeout(() => { setLoading(false); setSuccess(true); }, 1500);
+      setApiError("");
+      try {
+        const data = await verifyHospitalOtp(phone, otp);
+        localStorage.setItem("bb_token", data.token);
+        localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
+        setSuccess(true);
+      } catch (err) {
+        setOtpError(err.message);
+      } finally {
+        setLoading(false);
+      }
       return;
     }
     if (!validate()) return;
     setLoading(true);
-    setTimeout(() => { setLoading(false); setSuccess(true); }, 1700);
+    setApiError("");
+    try {
+      const data = await hospitalLogin(identifier, password);
+      localStorage.setItem("bb_token", data.token);
+      localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
+      setSuccess(true);
+    } catch (err) {
+      setApiError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const canSubmitPassword = (isEmail(identifier) || isPhone(identifier)) && password.length >= 6;
   const canSubmitOtp      = otpSent ? otp.length === 6 : isPhone(phone);
+
+  useEffect(() => {
+    if (!success) return;
+    const t = setTimeout(() => navigate("/hospital-dashboard"), 2500);
+    return () => clearTimeout(t);
+  }, [success]);
 
   /* ── Success Screen ─────────────────────────────────────────────── */
   if (success) return (
@@ -361,6 +408,12 @@ export default function HospitalLogin() {
                       </a>
                     </div>
 
+                    {apiError && (
+                      <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 font-medium">
+                        ⚠ {apiError}
+                      </p>
+                    )}
+
                     <button type="button" onClick={handleSubmit} disabled={!canSubmitPassword || loading}
                       className={`w-full py-3.5 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 mt-1
                         transition-all duration-300 shadow-md active:scale-[.98]
@@ -408,9 +461,13 @@ export default function HospitalLogin() {
                       </button>
                     </div>
 
-                    <p className="text-[11px] text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 font-medium">
-                      ✅ OTP sent! <span className="text-gray-500 font-normal">(Demo: use <code className="bg-green-100 px-1 rounded font-mono">123456</code>)</span>
-                    </p>
+                    {receivedOtp && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-center">
+                        <p className="text-[11px] text-amber-600 font-bold uppercase tracking-widest mb-1">Your OTP (demo)</p>
+                        <p className="text-2xl font-bold text-amber-700 tracking-[0.4em] font-mono">{receivedOtp}</p>
+                        <p className="text-[10px] text-amber-500 mt-1">Valid for 5 minutes</p>
+                      </div>
+                    )}
 
                     <OtpBoxes value={otp} onChange={v => { setOtp(v); setOtpError(""); }} error={otpError} />
 
@@ -419,7 +476,6 @@ export default function HospitalLogin() {
                         className="text-xs font-semibold text-red-500 hover:text-red-700 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors">
                         {resend > 0 ? `Resend in ${resend}s` : "Resend OTP →"}
                       </button>
-                      {otp === "123456" && <span className="text-xs text-green-600 font-semibold">✅ OTP matched</span>}
                     </div>
 
                     <button type="button" onClick={handleSubmit} disabled={otp.length !== 6 || loading}

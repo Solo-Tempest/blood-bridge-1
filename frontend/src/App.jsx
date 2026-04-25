@@ -14,6 +14,7 @@ import DonorRegistration from './pages/DonorRegistration';
 import DonorLogin        from './pages/DonorLogin';
 import HospitalRegistration from './pages/HospitalRegistration';
 import HospitalLogin        from './pages/HospitalLogin';
+import HospitalDashboard    from './pages/HospitalDashboard';
 
 function Layout() {
   return (
@@ -42,9 +43,10 @@ export default function App() {
     <BrowserRouter>
       <Toaster position="top-right" />
       <Routes>
-        {/* Portal has its own full-screen layout — no global Navbar/Footer */}
-        <Route path="/donor" element={<DonorPortal />} />
-        <Route path="/*"     element={<Layout />}      />
+        {/* Portals have their own full-screen layout — no global Navbar/Footer */}
+        <Route path="/donor"               element={<DonorPortal />}       />
+        <Route path="/hospital-dashboard"  element={<HospitalDashboard />} />
+        <Route path="/*"                   element={<Layout />}             />
       </Routes>
     </BrowserRouter>
   );
