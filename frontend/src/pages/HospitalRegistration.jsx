@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 
 /* ── Google Fonts ── */
 const GlobalStyles = () => (
@@ -692,6 +693,7 @@ function validate(step, fd) {
 
 /* ── main app ── */
 export default function HospitalRegistration() {
+  const navigate = useNavigate();
   const [step,    setStep]    = useState(1);
   const [errors,  setErrors]  = useState({});
   const [loading, setLoading] = useState(false);
@@ -720,6 +722,12 @@ export default function HospitalRegistration() {
   };
 
   /* success */
+  useEffect(() => {
+    if (!success) return;
+    const t = setTimeout(() => navigate("/hospital"), 2600);
+    return () => clearTimeout(t);
+  }, [success]);
+
   if(success) return (
     <>
       <GlobalStyles />

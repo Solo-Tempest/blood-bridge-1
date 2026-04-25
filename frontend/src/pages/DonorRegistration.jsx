@@ -1,5 +1,6 @@
-import { useState, useRef } from "react";
-import { Link } from "react-router-dom";
+import { useState, useRef, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { donorRegister } from "../api/auth";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const GENDERS = ["Male", "Female", "Other", "Prefer not to say"];
@@ -542,10 +543,13 @@ function validate(step, formData) {
 }
 
 export default function DonorRegistration() {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState({});
   const [otpSent, setOtpSent] = useState(false);
   const [verified, setVerified] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [apiError, setApiError] = useState("");
 
   const [personal, setPersonal] = useState({ name: "", dob: "", gender: "", phone: "", email: "", password: "", confirmPassword: "" });
   const [medical, setMedical] = useState({ bloodGroup: "", weight: "", hasDisease: false, disease: "", lastDonation: "", neverDonated: false, isHealthy: false });
@@ -564,6 +568,21 @@ export default function DonorRegistration() {
   const back = () => {
     setErrors({});
     setStep(s => s - 1);
+  };
+
+  const handleComplete = async () => {
+    setSubmitting(true);
+    setApiError("");
+    try {
+      const data = await donorRegister({ personal, medical, location });
+      localStorage.setItem("bb_token", data.token);
+      localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
+      navigate("/donor");
+    } catch (err) {
+      setApiError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -644,12 +663,23 @@ export default function DonorRegistration() {
             )}
 
             {verified && (
-              <button
-                type="button"
-                className="w-full mt-6 py-3.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-md hover:shadow-lg active:scale-95"
-              >
-                🎉 Complete Registration
-              </button>
+              <>
+                {apiError && (
+                  <p className="mt-4 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 font-medium">
+                    ⚠ {apiError}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={handleComplete}
+                  disabled={submitting}
+                  className="w-full mt-6 py-3.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                >
+                  {submitting ? (
+                    <><svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="3"/><path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z"/></svg> Registering…</>
+                  ) : "🎉 Complete Registration"}
+                </button>
+              </>
             )}
           </div>
 

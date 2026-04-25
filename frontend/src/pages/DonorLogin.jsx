@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { donorLogin, sendDonorOtp, verifyDonorOtp } from "../api/auth";
 
 const IconPhone = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
@@ -155,6 +156,7 @@ const bgStyle = {
 };
 
 export default function DonorLogin() {
+  const navigate = useNavigate();
   const [mode, setMode]             = useState("password");
   const [identifier, setIdentifier] = useState("");
   const [phone, setPhone]           = useState("");
@@ -163,10 +165,11 @@ export default function DonorLogin() {
   const [remember, setRemember]     = useState(false);
   const [errors, setErrors]         = useState({});
   const [loading, setLoading]       = useState(false);
+  const [apiError, setApiError]     = useState("");
   const [otpSent, setOtpSent]       = useState(false);
   const [otp, setOtp]               = useState("");
+  const [receivedOtp, setReceivedOtp] = useState("");
   const [resend, setResend]         = useState(0);
-  const [success, setSuccess]       = useState(false);
   const [cardIn, setCardIn]         = useState(false);
 
   useEffect(() => { requestAnimationFrame(() => setCardIn(true)); }, []);
@@ -202,26 +205,52 @@ export default function DonorLogin() {
     return !Object.keys(e).length;
   }
 
-  function handleSendOtp() {
+  async function handleSendOtp() {
     if (!validate()) return;
     setLoading(true);
-    setTimeout(() => {
+    setApiError("");
+    try {
+      const data = await sendDonorOtp(phone);
+      setReceivedOtp(data.otp);
       setOtpSent(true);
       setResend(30);
+    } catch (err) {
+      setApiError(err.message);
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (mode === "otp" && otpSent) {
       if (otp.length !== 6) { setErrors({ otp: "Enter the 6-digit OTP" }); return; }
       setLoading(true);
-      setTimeout(() => { setLoading(false); setSuccess(true); }, 1400);
+      setApiError("");
+      try {
+        const data = await verifyDonorOtp(phone, otp);
+        localStorage.setItem("bb_token", data.token);
+        localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
+        navigate("/donor");
+      } catch (err) {
+        setApiError(err.message);
+      } finally {
+        setLoading(false);
+      }
       return;
     }
     if (!validate()) return;
     setLoading(true);
-    setTimeout(() => { setLoading(false); setSuccess(true); }, 1600);
+    setApiError("");
+    try {
+      const data = await donorLogin(identifier, password);
+      localStorage.setItem("bb_token", data.token);
+      localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
+      navigate("/donor");
+    } catch (err) {
+      setApiError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const canSubmit = mode === "password"
@@ -229,34 +258,6 @@ export default function DonorLogin() {
     : otpSent
     ? otp.length === 6
     : isPhone(phone);
-
-  if (success) {
-    return (
-      <>
-        <PageStyles />
-        <div className="min-h-screen flex items-center justify-center px-4 pt-[60px]" style={bgStyle}>
-          <Drops />
-          <div className="text-center space-y-5 animate-cardIn">
-            <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-red-200 text-white text-4xl animate-heartBeat">
-              🩸
-            </div>
-            <div>
-              <h2 className="text-3xl font-bold text-gray-800" style={{ fontFamily: "'Playfair Display', serif" }}>
-                Welcome back!
-              </h2>
-              <p className="text-sm text-gray-500 mt-1">You're logged in to Blood Bridge</p>
-            </div>
-            <div className="bg-white/80 backdrop-blur rounded-2xl border border-red-100 px-6 py-4 shadow-lg shadow-red-50 inline-block">
-              <p className="text-xs text-red-400 font-semibold uppercase tracking-widest mb-1">Redirecting to dashboard…</p>
-              <div className="w-40 h-1 bg-red-100 rounded-full overflow-hidden mx-auto">
-                <div className="h-full bg-red-500 rounded-full animate-loadBar" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
 
   return (
     <>
@@ -363,15 +364,19 @@ export default function DonorLogin() {
                         Change
                       </button>
                     </div>
-                    <p className="text-xs text-green-600 bg-green-50 border border-green-100 rounded-xl px-4 py-3 font-medium">
-                      ✅ OTP sent! <span className="text-gray-500 font-normal">(Use <code className="bg-green-100 px-1 rounded font-mono">123456</code> for demo)</span>
-                    </p>
+                    {receivedOtp && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-center">
+                        <p className="text-[11px] text-amber-600 font-bold uppercase tracking-widest mb-1">Your OTP (demo)</p>
+                        <p className="text-2xl font-bold text-amber-700 tracking-[0.4em] font-mono">{receivedOtp}</p>
+                        <p className="text-[10px] text-amber-500 mt-1">Valid for 5 minutes</p>
+                      </div>
+                    )}
                     <OtpInput value={otp} onChange={setOtp} error={errors.otp} />
                     <div className="text-right">
                       <button
                         type="button"
                         disabled={resend > 0}
-                        onClick={() => { setResend(30); setOtp(""); }}
+                        onClick={() => { handleSendOtp(); setOtp(""); setReceivedOtp(""); }}
                         className="text-xs font-semibold text-red-500 hover:text-red-700 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
                       >
                         {resend > 0 ? `Resend in ${resend}s` : "Resend OTP →"}
@@ -417,6 +422,12 @@ export default function DonorLogin() {
                       Forgot password?
                     </a>
                   </div>
+                )}
+
+                {apiError && (
+                  <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 font-medium">
+                    ⚠ {apiError}
+                  </p>
                 )}
 
                 {mode === "otp" && !otpSent ? (

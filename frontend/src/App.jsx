@@ -22,7 +22,6 @@ function Layout() {
       <main>
         <Routes>
           <Route path="/"            element={<Home />}              />
-          <Route path="/donor"       element={<DonorPortal />}       />
           <Route path="/hospital"    element={<HospitalPortal />}    />
           <Route path="/eligibility" element={<EligibilityChecker />}/>
           <Route path="/chatbot"     element={<Chatbot />}           />
@@ -42,7 +41,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <Toaster position="top-right" />
-      <Layout />
+      <Routes>
+        {/* Portal has its own full-screen layout — no global Navbar/Footer */}
+        <Route path="/donor" element={<DonorPortal />} />
+        <Route path="/*"     element={<Layout />}      />
+      </Routes>
     </BrowserRouter>
   );
 }

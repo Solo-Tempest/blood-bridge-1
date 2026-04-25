@@ -1,0 +1,12 @@
+target/
+*.class
+*.jar
+*.war
+*.ear
+.mvn/
+mvnw
+mvnw.cmd
+.idea/
+*.iml
+.env
+application-local.properties
