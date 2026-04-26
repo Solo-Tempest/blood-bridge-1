@@ -81,6 +81,68 @@ export async function getDonorProfile(token) {
   return res.json();
 }
 
+export async function getHospitalProfile(token) {
+  const res = await fetch(`${API_URL}/hospital/me`, {
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  const data = await res.json();
+  return {
+    ...data,
+    contact:  data.contactName,
+    role:     data.contactRole,
+    is24x7:   data.open24x7,
+  };
+}
+
+export async function getDocuments(token) {
+  const res = await fetch(`${API_URL}/hospital/documents`, {
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function uploadDocument(token, type, file) {
+  const form = new FormData();
+  form.append("type", type);
+  form.append("file", file);
+  const res = await fetch(`${API_URL}/hospital/documents/upload`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${token}` },
+    body: form,
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function getBloodRequests(token) {
+  const res = await fetch(`${API_URL}/hospital/blood-requests`, {
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function createBloodRequest(token, data) {
+  const res = await fetch(`${API_URL}/hospital/blood-requests`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function cancelBloodRequest(token, id) {
+  const res = await fetch(`${API_URL}/hospital/blood-requests/${id}/cancel`, {
+    method: "PUT",
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
 export async function hospitalLogin(identifier, password) {
   const res = await fetch(`${BASE_URL}/hospital/login`, {
     method: "POST",

@@ -1,5 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, createContext, useContext } from "react";
 import { useNavigate } from "react-router-dom";
+import { getHospitalProfile, getDocuments, uploadDocument, getBloodRequests, createBloodRequest, cancelBloodRequest } from "../api/auth";
+
+const HCtx = createContext(null);
+const useH = () => useContext(HCtx);
 
 const G = () => (
   <style>{`
@@ -114,37 +118,35 @@ const G = () => (
   `}</style>
 );
 
-/* ── Mock Data ── */
-const H = {
-  name:"AIIMS Patna",type:"Government",regNo:"BR-HOSP-2009-00142",year:2012,website:"https://aiimspatna.edu.in",
-  street:"Phulwari Sharif",area:"Phulwari Sharif",city:"Patna",state:"Bihar",pincode:"801505",landmark:"Near Bailey Road",lat:"25.5605",lng:"85.1048",
-  contact:"Dr. Sanjay Verma",role:"Medical Superintendent",phone:"9876543210",altPhone:"0612-2345678",email:"admin@aiimspatna.edu.in",
-  beds:962,icuBeds:120,hasBloodBank:true,is24x7:true,bbLicense:"BB-BR-2012-AIIMS",completion:82,
+/* ── Fallback data (shown while loading) ── */
+const MOCK_H = {
+  name:"",type:"",regNo:"",year:"",website:"",
+  street:"",area:"",city:"",state:"",pincode:"",landmark:"",lat:"",lng:"",
+  contact:"",role:"",phone:"",altPhone:"",email:"",
+  beds:null,icuBeds:null,hasBloodBank:false,is24x7:false,bbLicense:"",
 };
-const HOURS=[{day:"Monday",open:true},{day:"Tuesday",open:true},{day:"Wednesday",open:true},{day:"Thursday",open:true},{day:"Friday",open:true},{day:"Saturday",open:true},{day:"Sunday",open:true}];
-const DOCS=[
-  {id:1,name:"Hospital License Certificate",icon:"📋",status:"verified",date:"2024-01-10",size:"1.2 MB"},
-  {id:2,name:"Government Approval Document",icon:"🏛️",status:"verified",date:"2024-01-10",size:"870 KB"},
-  {id:3,name:"Blood Bank Certification",icon:"🩸",status:"pending",date:"2024-03-05",size:"640 KB"},
-];
-const STATS=[
-  {icon:"🛏️",label:"Total Beds",value:"962",sub:"Operational",color:"#1d6fb8",bg:"#eff6ff"},
-  {icon:"🚨",label:"ICU / Emergency",value:"120",sub:"Critical care",color:"#dc2626",bg:"#fef2f2"},
-  {icon:"🩸",label:"Blood Bank",value:"Active",sub:"Licensed",color:"#0f766e",bg:"#f0fdfa"},
-  {icon:"📅",label:"Est. Year",value:"2012",sub:"13 yrs active",color:"#7c3aed",bg:"#f5f3ff"},
-];
+const DOC_META = {
+  LICENSE:      { label:"Hospital License Certificate", icon:"📋" },
+  GOVT_APPROVAL:{ label:"Government Approval Document",  icon:"🏛️" },
+  BB_CERT:      { label:"Blood Bank Certification",      icon:"🩸" },
+};
+function makeStats(H){
+  const age = H.year ? `${new Date().getFullYear() - H.year} yrs active` : "";
+  return [
+    {icon:"🛏️",label:"Total Beds",value:H.beds!=null?String(H.beds):"—",sub:"Operational",color:"#1d6fb8",bg:"#eff6ff"},
+    {icon:"🚨",label:"ICU / Emergency",value:H.icuBeds!=null?String(H.icuBeds):"—",sub:"Critical care",color:"#dc2626",bg:"#fef2f2"},
+    {icon:"🩸",label:"Blood Bank",value:H.hasBloodBank?"Active":"None",sub:H.hasBloodBank?"Licensed":"Not registered",color:"#0f766e",bg:"#f0fdfa"},
+    {icon:"📅",label:"Est. Year",value:H.year?String(H.year):"—",sub:age,color:"#7c3aed",bg:"#f5f3ff"},
+  ];
+}
 const BLOOD_GROUPS=["A+","A-","B+","B-","AB+","AB-","O+","O-"];
 const URGENCY_LEVELS=[
   {key:"normal",label:"Normal",color:"#15803d",bg:"#dcfce7",desc:"Standard request, within 24 hrs"},
   {key:"urgent",label:"Urgent",color:"#a16207",bg:"#fef9c3",desc:"Required within 6–12 hours"},
   {key:"critical",label:"Critical",color:"#dc2626",bg:"#fee2e2",desc:"Immediate — all nearby donors alerted"},
 ];
-const INIT_REQUESTS=[
-  {id:1,blood:"B+",units:2,donorsNeeded:5,urgency:"critical",distance:5,date:"2025-04-24",sent:42,accepted:7,declined:5,pending:30,status:"active",patient:"Rahul Verma",notes:"Post-surgery",escalation:2},
-  {id:2,blood:"O-",units:4,donorsNeeded:8,urgency:"urgent",distance:15,date:"2025-04-22",sent:118,accepted:23,declined:41,pending:54,status:"active",patient:"Priya Mehta",notes:"Accident victim",escalation:3},
-  {id:3,blood:"AB+",units:1,donorsNeeded:3,urgency:"normal",distance:10,date:"2025-04-18",sent:31,accepted:4,declined:18,pending:9,status:"fulfilled",patient:"Suresh Das",notes:"Scheduled surgery",escalation:1},
-  {id:4,blood:"A+",units:3,donorsNeeded:6,urgency:"urgent",distance:20,date:"2025-04-15",sent:87,accepted:12,declined:33,pending:42,status:"fulfilled",patient:"Anjali Singh",notes:"Thalassemia patient",escalation:2},
-];
+const BG_MAP = {"A+":"A_POSITIVE","A-":"A_NEGATIVE","B+":"B_POSITIVE","B-":"B_NEGATIVE","AB+":"AB_POSITIVE","AB-":"AB_NEGATIVE","O+":"O_POSITIVE","O-":"O_NEGATIVE"};
+const BG_LABEL = Object.fromEntries(Object.entries(BG_MAP).map(([k,v])=>[v,k]));
 
 /* ── Icons ── */
 const Ico = {
@@ -199,6 +201,7 @@ function MapPreview({city,state,lat,lng}){
 
 /* ── SIDEBAR ── */
 function Sidebar({active,setActive,onLogout,open,onClose}){
+  const H = useH();
   const nav=[
     {key:"dashboard",label:"Overview",icon:Ico.dashboard},
     {key:"profile",label:"Hospital Profile",icon:Ico.profile},
@@ -224,10 +227,6 @@ function Sidebar({active,setActive,onLogout,open,onClose}){
         <div style={{margin:"12px 12px 4px",background:"linear-gradient(135deg,#eff6ff,#f0fdfa)",border:"1px solid #bfdbfe",borderRadius:10,padding:"10px 12px"}}>
           <div style={{fontSize:12,fontWeight:700,color:"#1a2332",marginBottom:1}}>{H.name}</div>
           <div style={{fontSize:10.5,color:"#64748b"}}>{H.type} · {H.city}</div>
-          <div style={{marginTop:6}}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:9.5,color:"#94a3b8",marginBottom:3}}><span>Profile completion</span><span style={{fontWeight:700,color:"#1d6fb8"}}>{H.completion}%</span></div>
-            <div className="prog-track" style={{height:5}}><div className="prog-fill" style={{width:`${H.completion}%`,background:"linear-gradient(90deg,#1d6fb8,#0ea5e9)"}}/></div>
-          </div>
         </div>
         <nav style={{flex:1,padding:"8px 8px",display:"flex",flexDirection:"column",gap:2}}>
           <div className="sec-label" style={{padding:"6px 6px 3px",fontSize:9.5}}>Navigation</div>
@@ -243,6 +242,7 @@ function Sidebar({active,setActive,onLogout,open,onClose}){
 
 /* ── TOPBAR ── */
 function TopBar({page,setPage,onMenuClick}){
+  const H = useH();
   const labels={dashboard:"Dashboard",profile:"Hospital Profile",broadcast:"Blood Request",docs:"Documents",facility:"Facilities",contact:"Contact Info",hours:"Operating Hours",settings:"Settings"};
   return(
     <header className="topbar">
@@ -261,7 +261,7 @@ function TopBar({page,setPage,onMenuClick}){
           <span style={{position:"absolute",top:7,right:7,width:7,height:7,background:"#ef4444",borderRadius:"50%",border:"1.5px solid #fff"}}><span className="ping-dot" style={{position:"absolute",inset:0,background:"#ef4444",borderRadius:"50%",display:"block"}}/></span>
         </button>
         <div style={{width:34,height:34,background:"linear-gradient(135deg,#1d6fb8,#0ea5e9)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:12,flexShrink:0}}>
-          {H.contact.split(" ").map(w=>w[0]).join("").slice(0,2)}
+          {(H.contact||H.name||"?").split(" ").map(w=>w[0]).join("").slice(0,2)}
         </div>
       </div>
     </header>
@@ -270,6 +270,7 @@ function TopBar({page,setPage,onMenuClick}){
 
 /* ── DASHBOARD ── */
 function DashboardPage({setPage}){
+  const H = useH();
   return(
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
       <div className="fu" style={{background:"linear-gradient(135deg,#1d6fb8,#0284c7,#0ea5e9)",borderRadius:16,padding:"20px 22px",color:"#fff",position:"relative",overflow:"hidden"}}>
@@ -285,7 +286,7 @@ function DashboardPage({setPage}){
         </div>
       </div>
       <div className="stat-grid">
-        {STATS.map((s,i)=>(
+        {makeStats(H).map((s,i)=>(
           <div key={s.label} className={`stat fu d${i+1}`} style={{background:s.bg}}>
             <div style={{fontSize:22,marginBottom:8}}>{s.icon}</div>
             <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".5px",marginBottom:3}}>{s.label}</div>
@@ -297,7 +298,7 @@ function DashboardPage({setPage}){
       <div className="dash-2col">
         <div className="card fu d2">
           <SectionHead title="Quick Information" icon="🏥" onEdit={()=>setPage("profile")} editLabel="View"/>
-          {[{l:"Registration No.",v:H.regNo},{l:"Year Established",v:H.year},{l:"Website",v:H.website},{l:"Operating",v:"24 × 7 (All days)"}].map(r=>(
+          {[{l:"Registration No.",v:H.regNo},{l:"Year Established",v:H.year},{l:"Website",v:H.website},{l:"Operating",v:H.is24x7?"24 × 7 (All days)":H.openTime&&H.closeTime?`${H.openTime} – ${H.closeTime}`:"—"}].map(r=>(
             <div key={r.l} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",borderBottom:"1px solid #f1f5f9",paddingBottom:10,marginBottom:10}}>
               <span style={{fontSize:11.5,color:"#94a3b8",fontWeight:500,flexShrink:0,marginRight:8}}>{r.l}</span>
               <span style={{fontSize:12,color:"#1a2332",fontWeight:600,textAlign:"right",wordBreak:"break-all"}}>{r.v}</span>
@@ -337,6 +338,7 @@ function DashboardPage({setPage}){
 
 /* ── PROFILE ── */
 function ProfilePage(){
+  const H = useH();
   const [editing,setEditing]=useState(false);
   const [form,setForm]=useState({...H});
   const [saved,setSaved]=useState(false);
@@ -378,34 +380,108 @@ function ProfilePage(){
 
 /* ── DOCUMENTS ── */
 function DocsPage(){
+  const [docs,setDocs]         = useState([]);
+  const [loading,setLoading]   = useState(true);
+  const [uploading,setUploading] = useState(false);
+  const [selType,setSelType]   = useState("LICENSE");
+  const [selFile,setSelFile]   = useState(null);
+  const [error,setError]       = useState("");
+  const [success,setSuccess]   = useState("");
+  const token = localStorage.getItem("bb_token");
+
+  useEffect(()=>{
+    getDocuments(token).then(setDocs).catch(()=>setError("Failed to load documents")).finally(()=>setLoading(false));
+  },[]);
+
+  function fmt(bytes){ if(!bytes) return "—"; if(bytes<1024) return bytes+"B"; if(bytes<1048576) return (bytes/1024).toFixed(1)+"KB"; return (bytes/1048576).toFixed(1)+"MB"; }
+
+  async function handleUpload(){
+    if(!selFile){ setError("Please select a file"); return; }
+    setError(""); setUploading(true);
+    try{
+      const doc = await uploadDocument(token, selType, selFile);
+      setDocs(prev=>[doc,...prev]);
+      setSelFile(null);
+      setSuccess("Document uploaded successfully!");
+      setTimeout(()=>setSuccess(""),3000);
+    }catch(e){ setError(e.message); }
+    finally{ setUploading(false); }
+  }
+
+  const DOC_TYPES = [
+    {key:"LICENSE",label:"Hospital License Certificate"},
+    {key:"GOVT_APPROVAL",label:"Government Approval Document"},
+    {key:"BB_CERT",label:"Blood Bank Certification"},
+  ];
+
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      {success&&<div className="fu" style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#15803d",fontWeight:600}}>✅ {success}</div>}
+      {error&&<div className="fu" style={{background:"#fef2f2",border:"1.5px solid #fca5a5",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#dc2626",fontWeight:500}}>⚠ {error}</div>}
+
       <div className="card fu">
         <SectionHead title="Documents & Verification" icon="📄"/>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:12}}>
-          {DOCS.map((d,i)=>(
-            <div key={d.id} className={`fu d${i+1}`} style={{background:"#f8fafc",border:"1.5px solid #e2e8f0",borderRadius:13,padding:16}}>
-              <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:12}}>
-                <div style={{width:40,height:40,background:d.status==="verified"?"#dcfce7":d.status==="rejected"?"#fee2e2":"#fef9c3",borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{d.icon}</div>
-                <div style={{minWidth:0}}><div style={{fontSize:12.5,fontWeight:700,color:"#1a2332",marginBottom:2,wordBreak:"break-word"}}>{d.name}</div><div style={{fontSize:10.5,color:"#94a3b8"}}>Uploaded {new Date(d.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})} · {d.size}</div></div>
-              </div>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-                <StatusBadge status={d.status}/>
-                <div style={{display:"flex",gap:6}}>
-                  <button className="btn-ghost" style={{padding:"4px 10px",fontSize:11.5,display:"flex",alignItems:"center",gap:4}}>{Ico.eye} View</button>
-                  <button className="btn-ghost" style={{padding:"4px 10px",fontSize:11.5,display:"flex",alignItems:"center",gap:4}}>{Ico.download}</button>
+        {loading?(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:12}}>
+            {[0,1,2].map(i=><div key={i} className="skeleton" style={{height:100,borderRadius:12}}/>)}
+          </div>
+        ):docs.length===0?(
+          <div style={{textAlign:"center",padding:"28px 16px",color:"#94a3b8"}}>
+            <div style={{fontSize:32,marginBottom:8}}>📂</div>
+            <div style={{fontSize:13,fontWeight:600}}>No documents uploaded yet</div>
+          </div>
+        ):(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:12}}>
+            {docs.map((d,i)=>{
+              const meta = DOC_META[d.type]||{label:d.type,icon:"📄"};
+              const statusLower = (d.status||"").toLowerCase();
+              return(
+                <div key={d.id} className={`fu d${Math.min(i+1,5)}`} style={{background:"#f8fafc",border:"1.5px solid #e2e8f0",borderRadius:13,padding:16}}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:12}}>
+                    <div style={{width:40,height:40,background:statusLower==="verified"?"#dcfce7":statusLower==="rejected"?"#fee2e2":"#fef9c3",borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{meta.icon}</div>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontSize:12.5,fontWeight:700,color:"#1a2332",marginBottom:2,wordBreak:"break-word"}}>{meta.label}</div>
+                      <div style={{fontSize:10.5,color:"#94a3b8"}}>{d.originalName}</div>
+                      <div style={{fontSize:10.5,color:"#94a3b8"}}>{new Date(d.uploadedAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})} · {fmt(d.fileSize)}</div>
+                    </div>
+                  </div>
+                  <StatusBadge status={statusLower}/>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
+
       <div className="card fu d2">
         <SectionHead title="Upload New Document" icon="⬆️"/>
-        <div style={{border:"2px dashed #bfdbfe",borderRadius:12,padding:"28px 16px",textAlign:"center",background:"#f0f7ff",cursor:"pointer"}}>
-          <div style={{fontSize:30,marginBottom:7}}>📂</div>
-          <div style={{fontSize:13.5,fontWeight:600,color:"#1d6fb8",marginBottom:3}}>Drop file here or browse</div>
-          <div style={{fontSize:12,color:"#94a3b8"}}>PDF, JPG, PNG · Max 5MB</div>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            <span style={{fontSize:10.5,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".6px"}}>Document Type</span>
+            <select className="inp-plain" value={selType} onChange={e=>setSelType(e.target.value)}>
+              {DOC_TYPES.map(t=><option key={t.key} value={t.key}>{t.label}</option>)}
+            </select>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            <span style={{fontSize:10.5,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".6px"}}>File</span>
+            {selFile?(
+              <div style={{display:"flex",alignItems:"center",gap:10,background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:10,padding:"10px 14px"}}>
+                <span style={{fontSize:18}}>{selFile.type.includes("pdf")?"📄":"🖼️"}</span>
+                <div style={{flex:1,minWidth:0}}><div style={{fontSize:12.5,fontWeight:600,color:"#1a2332",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selFile.name}</div><div style={{fontSize:11,color:"#94a3b8"}}>{fmt(selFile.size)}</div></div>
+                <button onClick={()=>setSelFile(null)} style={{background:"transparent",border:"none",color:"#dc2626",cursor:"pointer",fontWeight:700,fontSize:12}}>Remove</button>
+              </div>
+            ):(
+              <label style={{border:"2px dashed #bfdbfe",borderRadius:12,padding:"22px 16px",textAlign:"center",background:"#f0f7ff",cursor:"pointer",display:"block"}}>
+                <div style={{fontSize:28,marginBottom:6}}>📂</div>
+                <div style={{fontSize:13,fontWeight:600,color:"#1d6fb8",marginBottom:2}}>Click to browse</div>
+                <div style={{fontSize:11.5,color:"#94a3b8"}}>PDF, JPG, PNG · Max 5MB</div>
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{display:"none"}} onChange={e=>{const f=e.target.files[0];if(f&&f.size>5*1024*1024){setError("File too large (max 5MB)");return;}setSelFile(f||null);setError("");}}/>
+              </label>
+            )}
+          </div>
+          <button className="btn-primary" onClick={handleUpload} disabled={uploading||!selFile} style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center"}}>
+            {uploading?<><span className="spin" style={{width:14,height:14,border:"2px solid #fff5",borderTop:"2px solid #fff",borderRadius:"50%",display:"inline-block"}}/> Uploading…</>:<>⬆️ Upload Document</>}
+          </button>
         </div>
       </div>
     </div>
@@ -414,6 +490,7 @@ function DocsPage(){
 
 /* ── FACILITIES ── */
 function FacilityPage(){
+  const H = useH();
   const [form,setForm]=useState({beds:H.beds,icuBeds:H.icuBeds,hasBloodBank:H.hasBloodBank,bbLicense:H.bbLicense});
   const [editing,setEditing]=useState(false);
   const [saved,setSaved]=useState(false);
@@ -459,6 +536,7 @@ function FacilityPage(){
 
 /* ── CONTACT ── */
 function ContactPage(){
+  const H = useH();
   const [editing,setEditing]=useState(false);
   const [form,setForm]=useState({contact:H.contact,role:H.role,phone:H.phone,altPhone:H.altPhone,email:H.email});
   const [saved,setSaved]=useState(false);
@@ -489,8 +567,10 @@ function ContactPage(){
 
 /* ── HOURS ── */
 function HoursPage(){
+  const H = useH();
   const [is24x7,setIs24x7]=useState(H.is24x7);
-  const [hours,setHours]=useState(HOURS.map(h=>({...h})));
+  const [openTime,setOpenTime]=useState(H.openTime||"09:00");
+  const [closeTime,setCloseTime]=useState(H.closeTime||"21:00");
   const [saved,setSaved]=useState(false);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
@@ -502,20 +582,25 @@ function HoursPage(){
           <div><div style={{fontSize:13,fontWeight:700,color:"#0f766e"}}>24 × 7 Operations</div><div style={{fontSize:11,color:"#5eead4"}}>Hospital operates round the clock</div></div>
           {is24x7&&<span className="badge badge-teal" style={{marginLeft:"auto"}}>Active</span>}
         </div>
-        {hours.map((h,i)=>(
-          <div key={h.day} className="hour-row">
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <div style={{width:26,height:26,background:h.open?"#eff6ff":"#f1f5f9",borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9.5,fontWeight:700,color:h.open?"#1d6fb8":"#94a3b8",flexShrink:0}}>{h.day.slice(0,2).toUpperCase()}</div>
-              <span style={{fontSize:13,fontWeight:500,color:"#1a2332"}}>{h.day}</span>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              {is24x7?<span className="badge badge-teal">24 × 7</span>:h.open?<div style={{display:"flex",alignItems:"center",gap:5}}><input type="time" className="inp-plain" defaultValue="09:00" style={{width:90,padding:"4px 7px",fontSize:12}}/><span style={{fontSize:11,color:"#94a3b8"}}>to</span><input type="time" className="inp-plain" defaultValue="21:00" style={{width:90,padding:"4px 7px",fontSize:12}}/></div>:<span className="badge badge-gray">Closed</span>}
-              <div style={{width:38,height:22,background:h.open?"#22c55e":"#e2e8f0",borderRadius:999,position:"relative",cursor:"pointer",transition:"background .25s",flexShrink:0}} onClick={()=>setHours(hrs=>hrs.map((x,j)=>j===i?{...x,open:!x.open}:x))}>
-                <div style={{position:"absolute",width:16,height:16,background:"#fff",borderRadius:"50%",top:3,left:h.open?19:3,transition:"left .25s"}}/>
+        {!is24x7&&(
+          <div className="fu" style={{background:"#f8fafc",border:"1.5px solid #e2e8f0",borderRadius:11,padding:"16px 18px",display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#64748b"}}>These hours apply every day (Mon – Sun)</div>
+            <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              <div style={{display:"flex",flexDirection:"column",gap:4,flex:1,minWidth:120}}>
+                <span style={{fontSize:10.5,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".6px"}}>Opening Time</span>
+                <input type="time" className="inp-plain" value={openTime} onChange={e=>setOpenTime(e.target.value)} style={{fontSize:14,fontWeight:600}}/>
+              </div>
+              <div style={{fontSize:18,color:"#94a3b8",marginTop:18,flexShrink:0}}>→</div>
+              <div style={{display:"flex",flexDirection:"column",gap:4,flex:1,minWidth:120}}>
+                <span style={{fontSize:10.5,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".6px"}}>Closing Time</span>
+                <input type="time" className="inp-plain" value={closeTime} onChange={e=>setCloseTime(e.target.value)} style={{fontSize:14,fontWeight:600}}/>
               </div>
             </div>
+            <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:9,padding:"9px 13px",fontSize:12,color:"#1d6fb8",fontWeight:500}}>
+              🕐 All days: <strong>{openTime}</strong> – <strong>{closeTime}</strong>
+            </div>
           </div>
-        ))}
+        )}
         <div style={{marginTop:16}}><button className="btn-primary" onClick={()=>{setSaved(true);setTimeout(()=>setSaved(false),3000);}}>Save Schedule</button></div>
       </div>
     </div>
@@ -579,11 +664,26 @@ function SettingsPage(){
 /* ════════════════════════════════════════════════
    BLOOD REQUEST PAGE  — full rewrite with new field
    ════════════════════════════════════════════════ */
+function normalizeRequest(r){
+  return {
+    ...r,
+    blood:      BG_LABEL[r.bloodGroup] || r.bloodGroup,
+    urgency:    (r.urgency||"").toLowerCase(),
+    distance:   r.distanceKm,
+    patient:    r.patientName,
+    escalation: r.escalationLevel,
+    date:       r.createdAt ? r.createdAt.split("T")[0] : "",
+    status:     (r.status||"").toLowerCase(),
+  };
+}
+
 function BloodRequestPage(){
+  const token = localStorage.getItem("bb_token");
+
   /* form state */
   const [bloodGroup,   setBloodGroup]   = useState("");
   const [units,        setUnits]        = useState(1);
-  const [donorsNeeded, setDonorsNeeded] = useState(2);   // must stay > units
+  const [donorsNeeded, setDonorsNeeded] = useState(2);
   const [urgency,      setUrgency]      = useState("urgent");
   const [distance,     setDistance]     = useState(10);
   const [patientName,  setPatientName]  = useState("");
@@ -596,11 +696,19 @@ function BloodRequestPage(){
   const [sentCount, setSentCount] = useState(0);
 
   /* request list */
-  const [requests,  setRequests]  = useState(INIT_REQUESTS);
+  const [requests,  setRequests]  = useState([]);
+  const [loadingReqs, setLoadingReqs] = useState(true);
   const [tab,       setTab]       = useState("new");
   const [cancelId,  setCancelId]  = useState(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
-  /* keep donorsNeeded always > units */
+  useEffect(()=>{
+    getBloodRequests(token)
+      .then(data=>setRequests(data.map(normalizeRequest)))
+      .catch(()=>{})
+      .finally(()=>setLoadingReqs(false));
+  },[]);
+
   function changeUnits(newUnits){
     setUnits(newUnits);
     if(donorsNeeded <= newUnits) setDonorsNeeded(newUnits + 1);
@@ -620,25 +728,38 @@ function BloodRequestPage(){
     return !Object.keys(e).length;
   }
 
-  function handleSend(){
+  async function handleSend(){
     if(!validate()) return;
     setSending(true);
-    setTimeout(()=>{
-      const newReq={
-        id:Date.now(), blood:bloodGroup, units, donorsNeeded, urgency, distance,
-        date:new Date().toISOString().split("T")[0],
-        sent:estimatedDonors, accepted:0, declined:0, pending:estimatedDonors,
-        status:"active", patient:patientName, notes, escalation:1,
-      };
-      setRequests(r=>[newReq,...r]);
-      setSentCount(estimatedDonors);
-      setSending(false); setSent(true);
+    try{
+      const created = await createBloodRequest(token, {
+        bloodGroup:   BG_MAP[bloodGroup],
+        units,
+        donorsNeeded,
+        urgency:      urgency.toUpperCase(),
+        distanceKm:   distance,
+        patientName,
+        notes,
+      });
+      const norm = normalizeRequest(created);
+      setRequests(r=>[norm,...r]);
+      setSentCount(norm.sent);
+      setSent(true);
       setBloodGroup(""); setUnits(1); setDonorsNeeded(2);
       setUrgency("urgent"); setDistance(10); setPatientName(""); setNotes(""); setErrors({});
-    }, 2000);
+    }catch(e){ setErrors({submit: e.message}); }
+    finally{ setSending(false); }
   }
 
-  function cancelRequest(id){ setRequests(r=>r.map(x=>x.id===id?{...x,status:"cancelled"}:x)); setCancelId(null); }
+  async function cancelRequest(id){
+    setCancelLoading(true);
+    try{
+      const updated = normalizeRequest(await cancelBloodRequest(token, id));
+      setRequests(r=>r.map(x=>x.id===id?updated:x));
+      setCancelId(null);
+    }catch(e){ alert(e.message); }
+    finally{ setCancelLoading(false); }
+  }
 
   /* ── Stepper component ── */
   const Stepper=({value, onDec, onInc, min=1, max=50, color="#1d6fb8", suffix=""})=>(
@@ -665,6 +786,8 @@ function BloodRequestPage(){
 
       {/* ══════════ NEW REQUEST ══════════ */}
       {tab==="new" && <>
+
+        {errors.submit&&<div className="fu" style={{background:"#fef2f2",border:"1.5px solid #fca5a5",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#dc2626",fontWeight:500}}>⚠ {errors.submit}</div>}
 
         {/* Success banner */}
         {sent&&(
@@ -839,8 +962,9 @@ function BloodRequestPage(){
       {/* ══════════ HISTORY ══════════ */}
       {tab==="history"&&(
         <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          {loadingReqs&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12}}>{[0,1,2,3].map(i=><div key={i} className="skeleton" style={{height:80,borderRadius:12}}/>)}</div>}
           {/* Summary */}
-          <div className="hist-grid fu">
+          {!loadingReqs&&<div className="hist-grid fu">
             {[
               {label:"Total Requests",value:requests.length,color:"#1d6fb8",bg:"#eff6ff"},
               {label:"Active",value:requests.filter(r=>r.status==="active").length,color:"#a16207",bg:"#fef9c3"},
@@ -854,7 +978,8 @@ function BloodRequestPage(){
                 <div style={{fontSize:22,fontWeight:800,color:s.color,fontFamily:"'Lora',serif"}}>{s.value}</div>
               </div>
             ))}
-          </div>
+          </div>}
+          {!loadingReqs&&requests.length===0&&<div style={{textAlign:"center",padding:"32px 16px",color:"#94a3b8"}}><div style={{fontSize:32,marginBottom:8}}>📋</div><div style={{fontSize:13,fontWeight:600}}>No blood requests sent yet</div></div>}
 
           {/* Per-request cards */}
           {requests.map((r,i)=>(
@@ -961,8 +1086,10 @@ function BloodRequestPage(){
               <p style={{fontSize:13,color:"#64748b",lineHeight:1.6}}>Donors who haven't responded will no longer see this request.</p>
             </div>
             <div style={{display:"flex",gap:10}}>
-              <button className="btn-ghost" onClick={()=>setCancelId(null)} style={{flex:1}}>Keep Active</button>
-              <button onClick={()=>cancelRequest(cancelId)} style={{flex:1,background:"#dc2626",color:"#fff",border:"none",borderRadius:9,padding:"9px 16px",fontWeight:700,fontSize:13,cursor:"pointer"}}>Yes, Cancel</button>
+              <button className="btn-ghost" onClick={()=>setCancelId(null)} style={{flex:1}} disabled={cancelLoading}>Keep Active</button>
+              <button onClick={()=>cancelRequest(cancelId)} disabled={cancelLoading} style={{flex:1,background:"#dc2626",color:"#fff",border:"none",borderRadius:9,padding:"9px 16px",fontWeight:700,fontSize:13,cursor:"pointer",opacity:cancelLoading?0.7:1}}>
+                {cancelLoading?"Cancelling…":"Yes, Cancel"}
+              </button>
             </div>
           </div>
         </div>
@@ -998,8 +1125,16 @@ export default function HospitalDashboard(){
   const [showLogout,setShowLogout]   = useState(false);
   const [loggedOut,setLoggedOut]     = useState(false);
   const [loading,setLoading]         = useState(true);
+  const [hospital,setHospital]       = useState(MOCK_H);
+  const [fetchError,setFetchError]   = useState("");
 
-  useEffect(()=>{setTimeout(()=>setLoading(false),800);},[]);
+  useEffect(()=>{
+    const token = localStorage.getItem("bb_token");
+    if(!token){ routerNav("/hospital-login"); return; }
+    getHospitalProfile(token)
+      .then(data=>{ setHospital(data); setLoading(false); })
+      .catch(err=>{ setFetchError(err.message); setLoading(false); });
+  },[]);
 
   function navigate(p){setPage(p);setSidebarOpen(false);}
 
@@ -1032,7 +1167,21 @@ export default function HospitalDashboard(){
     </>
   );
 
+  if(fetchError) return(
+    <><G/>
+      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f0f4f8"}}>
+        <div style={{textAlign:"center",padding:"0 20px"}}>
+          <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
+          <div style={{fontSize:16,fontFamily:"'Lora',serif",fontWeight:700,color:"#1a2332",marginBottom:6}}>Failed to load dashboard</div>
+          <div style={{fontSize:13,color:"#64748b",marginBottom:20}}>{fetchError}</div>
+          <button className="btn-primary" onClick={()=>routerNav("/hospital-login")}>← Back to Login</button>
+        </div>
+      </div>
+    </>
+  );
+
   return(
+    <HCtx.Provider value={hospital}>
     <><G/>
       <div className="layout">
         <Sidebar active={page} setActive={navigate} onLogout={()=>{setSidebarOpen(false);setShowLogout(true);}} open={sidebarOpen} onClose={()=>setSidebarOpen(false)}/>
@@ -1052,5 +1201,6 @@ export default function HospitalDashboard(){
         {showLogout&&<LogoutModal onConfirm={()=>setLoggedOut(true)} onCancel={()=>setShowLogout(false)}/>}
       </div>
     </>
+    </HCtx.Provider>
   );
 }
