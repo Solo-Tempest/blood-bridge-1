@@ -15,6 +15,8 @@ import DonorLogin        from './pages/DonorLogin';
 import HospitalRegistration from './pages/HospitalRegistration';
 import HospitalLogin        from './pages/HospitalLogin';
 import HospitalDashboard    from './pages/HospitalDashboard';
+import PrivacyPolicy        from './pages/PrivacyPolicy';
+import TermsAndConditions   from './pages/TermsAndConditions';
 
 function Layout() {
   return (
@@ -31,6 +33,8 @@ function Layout() {
           <Route path="/donor-login"    element={<DonorLogin />}        />
           <Route path="/hospital-register" element={<HospitalRegistration />} />
           <Route path="/hospital-login"    element={<HospitalLogin />}        />
+          <Route path="/privacy"           element={<PrivacyPolicy />}        />
+          <Route path="/terms"             element={<TermsAndConditions />}   />
         </Routes>
       </main>
       <Footer />

@@ -1,51 +1,106 @@
 import { Link } from 'react-router-dom';
-import { FOOTER_LINKS } from '../../constants/tokens';
+import './Footer.css';
 
 export default function Footer() {
   return (
-    <footer className="bg-bb-ink text-white px-4 md:px-20 pt-12 pb-8">
-      <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr] gap-10 mb-10">
+    <footer className="bb-footer">
+      <div className="bb-watermark">BB</div>
+
+      <div className="bb-grid">
+
+        {/* Col 1: Brand */}
         <div>
-          <h3 className="text-white text-[1.2rem] mb-2.5 font-serif">Blood Bridge</h3>
-          <p className="text-bb-ink-30 text-[0.85rem] leading-relaxed max-w-[280px]">
-            An AI-powered smart blood donation and management system. Connecting donors,
-            hospitals, and blood banks through intelligent technology.
-          </p>
-          <div className="mt-4 text-[0.78rem] text-bb-ink-30 font-mono leading-relaxed">
-            Final Year Project · Computer Science &amp; Engineering
-            <br />
-            Built with FastAPI · React · PyTorch · Rasa
+          <div className="bb-logo-mark">
+            <svg className="bb-drop" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M18 3 C18 3 6 16 6 23 C6 29.6 11.4 35 18 35 C24.6 35 30 29.6 30 23 C30 16 18 3 18 3Z" fill="#c0392b"/>
+              <path d="M18 14 C18 14 11 21.5 11 25.5 C11 28.5 14.1 31 18 31 C21.9 31 25 28.5 25 25.5 C25 21.5 18 14 18 14Z" fill="rgba(255,255,255,0.12)"/>
+              <path d="M13 24 Q18 19 23 24" stroke="rgba(255,255,255,0.2)" strokeWidth="1" fill="none"/>
+            </svg>
+            <span className="bb-brand-name">Blood Bridge</span>
+          </div>
+          <p className="bb-tagline">"Connecting donors, saving lives — one drop at a time."</p>
+          <p className="bb-about-text">A two-way platform that bridges the gap between blood donors and hospitals. Donors receive real-time requests; hospitals find matches fast.</p>
+          <p className="bb-project-note">Final year project · Team of 5</p>
+          <div className="bb-social-row">
+            <div className="bb-social-btn" title="GitHub">
+              <svg viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+            </div>
+            <div className="bb-social-btn" title="LinkedIn">
+              <svg viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+            </div>
+            <div className="bb-social-btn" title="Instagram">
+              <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+            </div>
           </div>
         </div>
 
-        {Object.entries(FOOTER_LINKS).map(([heading, links]) => (
-          <div key={heading}>
-            <h5 className="text-[0.78rem] uppercase tracking-[0.06em] text-bb-ink-30 mb-3.5">
-              {heading}
-            </h5>
-            <ul className="list-none space-y-2">
-              {links.map(({ label, to }) => (
-                <li key={label}>
-                  <Link
-                    to={to}
-                    className="text-bb-ink-30 no-underline text-[0.88rem] transition-colors duration-200 hover:text-white"
-                  >
-                    {label}
-                  </Link>
-                </li>
-              ))}
+        {/* Col 2: Quick Links */}
+        <div>
+          <p className="bb-col-title">Quick links</p>
+          <ul className="bb-links">
+            <li><Link to="/"><span>Home</span> <span className="arrow">→</span></Link></li>
+            <li><Link to="/donor-register"><span>Register as donor</span> <span className="arrow">→</span></Link></li>
+            <li><Link to="/hospital-register"><span>Register as hospital</span> <span className="arrow">→</span></Link></li>
+            <li><Link to="/about"><span>About us</span> <span className="arrow">→</span></Link></li>
+          </ul>
+        </div>
+
+        {/* Col 3: How it works */}
+        <div>
+          <p className="bb-col-title">How it works</p>
+          <div className="bb-how-step">
+            <div className="bb-step-num">1</div>
+            <div className="bb-step-text"><strong>Hospital posts a request</strong>Blood type, units needed, urgency level</div>
+          </div>
+          <div className="bb-how-step">
+            <div className="bb-step-num">2</div>
+            <div className="bb-step-text"><strong>Donors get notified</strong>Nearby eligible donors receive the alert instantly</div>
+          </div>
+          <div className="bb-how-step">
+            <div className="bb-step-num">3</div>
+            <div className="bb-step-text"><strong>Donor responds</strong>Accepts or declines; hospital confirms the match</div>
+          </div>
+        </div>
+
+        {/* Col 4: Emergency + Legal + Contact */}
+        <div>
+          <div className="bb-section-block">
+            <p className="bb-col-title">Emergency</p>
+            <div className="bb-emergency-inline">
+              <p className="bb-emergency-num">104</p>
+              <div className="bb-emergency-info">
+                <span className="bb-emergency-label">National blood helpline</span>
+                <span className="bb-emergency-sub">24 × 7 · Free call</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bb-section-block">
+            <p className="bb-col-title">Legal</p>
+            <ul className="bb-links">
+              <li><Link to="/privacy"><span>Privacy policy</span> <span className="arrow">→</span></Link></li>
+              <li><Link to="/terms"><span>Terms &amp; conditions</span> <span className="arrow">→</span></Link></li>
+            </ul>
+            <div className="bb-legal-badges">
+              <span className="bb-badge">Data safe</span>
+              <span className="bb-badge">DPDP compliant</span>
+            </div>
+          </div>
+
+          <div className="bb-section-block">
+            <p className="bb-col-title">Contact</p>
+            <ul className="bb-links">
+              <li><a href="mailto:support@bloodbridge.in"><span>support@bloodbridge.in</span> <span className="arrow">→</span></a></li>
+              <li><a href="#"><span>Report an issue</span> <span className="arrow">→</span></a></li>
             </ul>
           </div>
-        ))}
+        </div>
+
       </div>
 
-      <div className="border-t border-white/[0.08] pt-6 flex justify-between items-center flex-wrap gap-2">
-        <p className="text-[0.78rem] text-bb-ink-30">
-          © 2025 Blood Bridge. Built for academic demonstration.
-        </p>
-        <p className="font-mono text-[0.72rem] text-bb-ink-30">
-          v1.0.0 · Jharkhand, India
-        </p>
+      <div className="bb-divider"></div>
+      <div className="bb-bottom">
+        <p className="bb-made-with">Made with <span>♥</span> by Team Blood Bridge · B.Tech 2025 · India 🇮🇳</p>
       </div>
     </footer>
   );

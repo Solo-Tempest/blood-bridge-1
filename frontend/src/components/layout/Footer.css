@@ -1,0 +1,123 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500&display=swap');
+
+.bb-footer {
+  background: #1a0a0a;
+  color: #f5e6e6;
+  font-family: 'DM Sans', sans-serif;
+  padding: 1.5rem 2rem 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.bb-footer::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #c0392b, #e74c3c, #c0392b);
+}
+
+.bb-watermark {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'DM Serif Display', serif;
+  font-size: 140px;
+  color: rgba(192,57,43,0.04);
+  pointer-events: none;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.bb-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1fr;
+  gap: 1.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 768px) {
+  .bb-grid { grid-template-columns: 1fr; }
+}
+
+.bb-logo-mark { display: flex; align-items: center; gap: 8px; margin-bottom: 0.6rem; }
+.bb-drop { width: 28px; height: 28px; flex-shrink: 0; }
+
+.bb-brand-name {
+  font-family: 'DM Serif Display', serif;
+  font-size: 19px; color: #fff; letter-spacing: 0.3px;
+}
+
+.bb-tagline { font-size: 12px; color: #c97b7b; margin-bottom: 0.6rem; line-height: 1.5; font-style: italic; }
+.bb-about-text { font-size: 12.5px; color: #9e7070; line-height: 1.65; margin-bottom: 0.75rem; }
+.bb-project-note { font-size: 11px; color: #4a2a2a; margin-bottom: 0.65rem; }
+
+.bb-social-row { display: flex; gap: 8px; }
+
+.bb-social-btn {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 0.5px solid #3a1f1f; background: #2a1010;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: border-color 0.2s, background 0.2s;
+}
+.bb-social-btn:hover { border-color: #c0392b; background: #3a1515; }
+.bb-social-btn svg { width: 12px; height: 12px; fill: #c97b7b; }
+
+.bb-col-title {
+  font-size: 10px; font-weight: 500; letter-spacing: 1.5px;
+  text-transform: uppercase; color: #c0392b;
+  margin-bottom: 0.85rem; margin-top: 0;
+}
+
+.bb-links { list-style: none; padding: 0; margin: 0; }
+.bb-links li { margin-bottom: 0.4rem; }
+.bb-links a {
+  font-size: 12.5px; color: #9e7070; text-decoration: none;
+  transition: color 0.2s; display: flex; align-items: center; gap: 6px;
+}
+.bb-links a:hover { color: #f5e6e6; }
+.bb-links a .arrow {
+  font-size: 10px; opacity: 0;
+  transition: opacity 0.2s, transform 0.2s; transform: translateX(-4px);
+}
+.bb-links a:hover .arrow { opacity: 1; transform: translateX(0); }
+
+.bb-how-step { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 0.65rem; }
+.bb-step-num {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #2a1010; border: 0.5px solid #3a1f1f;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 500; color: #c0392b;
+  flex-shrink: 0; margin-top: 1px;
+}
+.bb-step-text { font-size: 12px; color: #9e7070; line-height: 1.5; }
+.bb-step-text strong { display: block; color: #c97b7b; font-weight: 500; font-size: 11.5px; margin-bottom: 1px; }
+
+.bb-emergency-inline {
+  display: flex; align-items: center; gap: 10px;
+  background: #2a1010; border: 0.5px solid #3a1f1f;
+  border-radius: 6px; padding: 0.55rem 0.75rem;
+  margin-bottom: 0.85rem;
+}
+.bb-emergency-num {
+  font-family: 'DM Serif Display', serif;
+  font-size: 20px; color: #fff; line-height: 1;
+}
+.bb-emergency-info { display: flex; flex-direction: column; gap: 1px; }
+.bb-emergency-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #c0392b; }
+.bb-emergency-sub { font-size: 10.5px; color: #6b4040; }
+
+.bb-legal-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 0.5rem; }
+.bb-badge { font-size: 10px; padding: 2px 7px; border-radius: 999px; border: 0.5px solid #3a1f1f; color: #6b4040; }
+
+.bb-section-block { margin-bottom: 0.75rem; }
+
+.bb-divider { height: 0.5px; background: #2a1010; margin: 1rem 0 0; position: relative; z-index: 1; }
+
+.bb-bottom {
+  display: flex; justify-content: center; align-items: center;
+  padding: 0.45rem 0 0.6rem; position: relative; z-index: 1;
+}
+.bb-made-with { font-size: 11.5px; color: #4a2a2a; }
+.bb-made-with span { color: #c0392b; }

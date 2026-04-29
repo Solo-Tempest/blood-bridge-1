@@ -585,6 +585,15 @@ export default function DonorRegistration() {
     }
   };
 
+  const goBackToEdit = (targetStep = 1) => {
+    setApiError("");
+    setErrors({});
+    setVerified(false);
+    setOtpSent(false);
+    setOtpData({ otp: "", otpError: "" });
+    setStep(targetStep);
+  };
+
   return (
     <>
       <style>{`
@@ -664,21 +673,50 @@ export default function DonorRegistration() {
 
             {verified && (
               <>
-                {apiError && (
-                  <p className="mt-4 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 font-medium">
-                    ⚠ {apiError}
-                  </p>
+                {apiError ? (
+                  <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-5 space-y-4">
+                    <div className="flex items-start gap-3">
+                      <span className="text-xl mt-0.5">⚠️</span>
+                      <div>
+                        <p className="text-sm font-semibold text-red-700">Registration failed</p>
+                        <p className="text-xs text-red-500 mt-0.5">{apiError}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Please go back to check and correct your details, then re-verify your OTP to try again.
+                    </p>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => goBackToEdit(1)}
+                        className="flex-1 py-2.5 border-2 border-red-300 text-red-600 rounded-xl font-semibold text-xs hover:bg-red-100 transition-all duration-200 active:scale-95"
+                      >
+                        ← Edit details
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleComplete}
+                        disabled={submitting}
+                        className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5"
+                      >
+                        {submitting ? (
+                          <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="3"/><path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z"/></svg> Retrying…</>
+                        ) : "Retry"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleComplete}
+                    disabled={submitting}
+                    className="w-full mt-6 py-3.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    {submitting ? (
+                      <><svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="3"/><path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z"/></svg> Registering…</>
+                    ) : "🎉 Complete Registration"}
+                  </button>
                 )}
-                <button
-                  type="button"
-                  onClick={handleComplete}
-                  disabled={submitting}
-                  className="w-full mt-6 py-3.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
-                >
-                  {submitting ? (
-                    <><svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="3"/><path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z"/></svg> Registering…</>
-                  ) : "🎉 Complete Registration"}
-                </button>
               </>
             )}
           </div>

@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { NAV_LINKS } from '../../constants/tokens';
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { pathname } = useLocation();
+  const onLoginPage = pathname === '/donor-login' || pathname === '/hospital-login';
 
   return (
     <nav className="
@@ -48,20 +50,22 @@ export default function Navbar() {
         </ul>
 
         {/* Desktop login buttons */}
-        <div className="hidden md:flex items-center gap-2 ml-3">
-          <NavLink
-            to="/donor-login"
-            className="inline-flex items-center bg-bb-red text-white px-5 py-2 rounded-full text-[0.88rem] font-medium no-underline transition-all duration-200 hover:bg-bb-red-dark hover:-translate-y-px"
-          >
-            Donor Login
-          </NavLink>
-          <NavLink
-            to="/hospital-login"
-            className="inline-flex items-center bg-bb-red text-white px-5 py-2 rounded-full text-[0.88rem] font-medium no-underline transition-all duration-200 hover:bg-bb-red-dark hover:-translate-y-px"
-          >
-            Hospital Login
-          </NavLink>
-        </div>
+        {!onLoginPage && (
+          <div className="hidden md:flex items-center gap-2 ml-3">
+            <NavLink
+              to="/donor-login"
+              className="inline-flex items-center bg-bb-red text-white px-5 py-2 rounded-full text-[0.88rem] font-medium no-underline transition-all duration-200 hover:bg-bb-red-dark hover:-translate-y-px"
+            >
+              Donor Login
+            </NavLink>
+            <NavLink
+              to="/hospital-login"
+              className="inline-flex items-center bg-bb-red text-white px-5 py-2 rounded-full text-[0.88rem] font-medium no-underline transition-all duration-200 hover:bg-bb-red-dark hover:-translate-y-px"
+            >
+              Hospital Login
+            </NavLink>
+          </div>
+        )}
 
         {/* Mobile hamburger */}
         <button
@@ -98,22 +102,24 @@ export default function Navbar() {
               {label}
             </NavLink>
           ))}
-          <div className="flex flex-col gap-2 pt-2 border-t border-bb-ink-10">
-            <NavLink
-              to="/donor-login"
-              onClick={() => setMenuOpen(false)}
-              className="inline-flex justify-center items-center bg-bb-red text-white px-5 py-2.5 rounded-full text-[0.9rem] font-medium no-underline hover:bg-bb-red-dark transition-colors"
-            >
-              Donor Login
-            </NavLink>
-            <NavLink
-              to="/hospital-login"
-              onClick={() => setMenuOpen(false)}
-              className="inline-flex justify-center items-center bg-bb-red text-white px-5 py-2.5 rounded-full text-[0.9rem] font-medium no-underline hover:bg-bb-red-dark transition-colors"
-            >
-              Hospital Login
-            </NavLink>
-          </div>
+          {!onLoginPage && (
+            <div className="flex flex-col gap-2 pt-2 border-t border-bb-ink-10">
+              <NavLink
+                to="/donor-login"
+                onClick={() => setMenuOpen(false)}
+                className="inline-flex justify-center items-center bg-bb-red text-white px-5 py-2.5 rounded-full text-[0.9rem] font-medium no-underline hover:bg-bb-red-dark transition-colors"
+              >
+                Donor Login
+              </NavLink>
+              <NavLink
+                to="/hospital-login"
+                onClick={() => setMenuOpen(false)}
+                className="inline-flex justify-center items-center bg-bb-red text-white px-5 py-2.5 rounded-full text-[0.9rem] font-medium no-underline hover:bg-bb-red-dark transition-colors"
+              >
+                Hospital Login
+              </NavLink>
+            </div>
+          )}
         </div>
       )}
     </nav>
