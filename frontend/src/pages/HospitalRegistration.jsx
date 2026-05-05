@@ -1,6 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { hospitalRegister } from "../api/auth";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
 
 /* ── Google Fonts ── */
 const GlobalStyles = () => (
@@ -169,14 +177,109 @@ function Step1({ d, set, errors }) {
 
 /* ── Step 2: Location ── */
 function Step2({ d, set, errors }) {
-  const [gpsStatus, setGpsStatus] = useState("idle");
-  const detectGPS = () => {
-    setGpsStatus("loading");
-    navigator.geolocation?.getCurrentPosition(
-      pos => { set({ ...d, lat: pos.coords.latitude.toFixed(5), lng: pos.coords.longitude.toFixed(5) }); setGpsStatus("done"); },
-      ()  => setGpsStatus("error")
+  const mapDivRef = useRef(null);
+  const mapRef    = useRef(null);
+  const markerRef = useRef(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching,   setSearching]   = useState(false);
+  const [searchErr,   setSearchErr]   = useState("");
+  const [locating,    setLocating]    = useState(false);
+  const [geoErr,      setGeoErr]      = useState("");
+
+  useEffect(() => {
+    if (!mapDivRef.current || mapRef.current) return;
+    const center = d.lat && d.lng ? [Number(d.lat), Number(d.lng)] : [20.5937, 78.9629];
+    const map = L.map(mapDivRef.current, { center, zoom: d.lat ? 14 : 5 });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(map);
+    map.on("click", e => {
+      placeOrMoveMarker(e.latlng.lat, e.latlng.lng, map);
+      reverseGeocode(e.latlng.lat, e.latlng.lng);
+    });
+    if (d.lat && d.lng) placeOrMoveMarker(Number(d.lat), Number(d.lng), map);
+    mapRef.current = map;
+    return () => { map.remove(); mapRef.current = null; markerRef.current = null; };
+  }, []);
+
+  const placeOrMoveMarker = (lat, lng, mapInstance) => {
+    const map = mapInstance || mapRef.current;
+    if (!map) return;
+    if (markerRef.current) {
+      markerRef.current.setLatLng([lat, lng]);
+    } else {
+      const marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+      marker.on("dragend", () => {
+        const pos = marker.getLatLng();
+        reverseGeocode(pos.lat, pos.lng);
+      });
+      markerRef.current = marker;
+    }
+    map.flyTo([lat, lng], Math.max(map.getZoom(), 14));
+  };
+
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+        { headers: { "User-Agent": "BloodBridge/1.0" } }
+      );
+      const json = await res.json();
+      if (json.address) {
+        const a = json.address;
+        const city = a.city || a.town || a.village || a.county || "";
+        const stateMatch = INDIAN_STATES.find(s => s.toLowerCase() === (a.state || "").toLowerCase()) || "";
+        set(prev => ({
+          ...prev,
+          lat: String(lat), lng: String(lng),
+          city: city || prev.city,
+          state: stateMatch || prev.state,
+          pincode: a.postcode || prev.pincode,
+        }));
+        setSearchQuery(json.display_name || "");
+      } else {
+        set(prev => ({ ...prev, lat: String(lat), lng: String(lng) }));
+      }
+    } catch {
+      set(prev => ({ ...prev, lat: String(lat), lng: String(lng) }));
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setSearching(true); setSearchErr("");
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1&countrycodes=in`,
+        { headers: { "User-Agent": "BloodBridge/1.0" } }
+      );
+      const json = await res.json();
+      if (!json.length) { setSearchErr("Location not found. Try a different search."); return; }
+      const { lat, lon } = json[0];
+      placeOrMoveMarker(Number(lat), Number(lon));
+      reverseGeocode(Number(lat), Number(lon));
+    } catch { setSearchErr("Search failed. Please try again."); }
+    finally { setSearching(false); }
+  };
+
+  const handleCurrentLocation = () => {
+    if (!navigator.geolocation) { setGeoErr("Geolocation not supported."); return; }
+    setLocating(true); setGeoErr("");
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        placeOrMoveMarker(pos.coords.latitude, pos.coords.longitude);
+        reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+        setLocating(false);
+      },
+      err => {
+        setLocating(false);
+        setGeoErr(err.code === 1 ? "Location permission denied. Please allow in browser settings." : "Could not detect location. Please try again.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
     );
   };
+
   return (
     <div className="space-y-5 fade-up">
       <Hd title="Location & Address" sub="Help donors and patients locate your hospital easily" />
@@ -216,39 +319,52 @@ function Step2({ d, set, errors }) {
         <input className={inp(false)} placeholder="e.g. Near Gandhi Maidan" value={d.landmark}
           onChange={e => set({ ...d, landmark: e.target.value })} />
       </Field>
-      {/* GPS + map preview */}
+
+      {/* Interactive Map */}
       <div>
-        <label className={lbl}>GPS Coordinates (optional)</label>
-        <div className="flex gap-3 mb-3">
-          <div className="relative flex-1 group">
-            <Li>📡</Li>
-            <input className={inp(false)} placeholder="Latitude" value={d.lat} readOnly />
-          </div>
-          <div className="relative flex-1 group">
-            <Li>📡</Li>
-            <input className={inp(false)} placeholder="Longitude" value={d.lng} readOnly />
-          </div>
+        <label className={lbl}>
+          📍 Pin Hospital Location on Map
+          <span className="text-gray-400 font-normal normal-case text-[11px] ml-1">(auto-fills city / state / pincode)</span>
+        </label>
+        <p className="text-[11px] text-gray-400 mb-3">Search, click the map, drag the pin, or use GPS to set exact coordinates.</p>
+
+        {/* Search */}
+        <div className="flex gap-2 mb-2">
+          <input
+            className="flex-1 bg-white border border-rose-100 rounded-xl px-4 py-2.5 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-300 shadow-sm"
+            placeholder="Search hospital address or area…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleSearch()}
+          />
+          <button type="button" onClick={handleSearch} disabled={searching}
+            className="px-4 py-2.5 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 disabled:bg-gray-200 disabled:text-gray-400 transition-all shadow-sm">
+            {searching ? "…" : "Go"}
+          </button>
         </div>
-        <button type="button" onClick={detectGPS}
-          className={`w-full py-3 rounded-xl border-2 border-dashed text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-300
-            ${gpsStatus==="done"    ? "border-green-400 bg-green-50 text-green-600"
-              : gpsStatus==="error" ? "border-red-300 bg-red-50 text-red-500"
-              : gpsStatus==="loading" ? "border-amber-300 bg-amber-50 text-amber-600 pulse"
+        {searchErr && <p className="text-xs text-red-500 mb-2">{searchErr}</p>}
+
+        {/* GPS button */}
+        <button type="button" onClick={handleCurrentLocation} disabled={locating}
+          className={`w-full mb-2 py-2.5 rounded-xl border-2 border-dashed text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-300
+            ${locating
+              ? "border-amber-300 bg-amber-50 text-amber-600 pulse cursor-not-allowed"
               : "border-red-200 bg-red-50 text-red-500 hover:bg-red-100"}`}>
-          {gpsStatus==="idle"    && <><span>📡</span> Detect My Location</>}
-          {gpsStatus==="loading" && <><span>⏳</span> Detecting…</>}
-          {gpsStatus==="done"    && <><span>✅</span> Location Detected — {d.lat}, {d.lng}</>}
-          {gpsStatus==="error"   && <><span>❌</span> Permission denied</>}
+          {locating ? <><span>⏳</span> Detecting location…</> : <><span>📡</span> Use My Current Location</>}
         </button>
-        {/* Map preview placeholder */}
-        <div className="mt-3 rounded-2xl overflow-hidden border border-rose-100 h-32 bg-gradient-to-br from-rose-50 to-red-50 flex items-center justify-center relative">
-          <div className="absolute inset-0 opacity-10" style={{backgroundImage:"repeating-linear-gradient(0deg,#d32f2f 0,#d32f2f 1px,transparent 1px,transparent 40px),repeating-linear-gradient(90deg,#d32f2f 0,#d32f2f 1px,transparent 1px,transparent 40px)"}} />
-          <div className="text-center z-10">
-            <span className="text-3xl">🗺️</span>
-            <p className="text-xs text-red-400 font-semibold mt-1">Map Preview</p>
-            <p className="text-[10px] text-gray-400">{d.lat && d.lng ? `${d.lat}, ${d.lng}` : "Detect location to preview"}</p>
+        {geoErr && <p className="text-xs text-red-500 mb-2">{geoErr}</p>}
+
+        {/* Leaflet map */}
+        <div ref={mapDivRef} className="rounded-2xl overflow-hidden border border-rose-100 shadow-sm" style={{ height: 300 }} />
+
+        {/* Coordinates badge */}
+        {d.lat && d.lng && (
+          <div className="mt-2 flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
+            <span className="text-sm">📍</span>
+            <span className="text-xs font-semibold text-green-700">{Number(d.lat).toFixed(5)}, {Number(d.lng).toFixed(5)}</span>
+            <span className="text-xs text-green-500 ml-auto">Location pinned ✓</span>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

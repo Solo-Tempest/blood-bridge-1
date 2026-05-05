@@ -231,6 +231,8 @@ export async function donorRegister({ personal, medical, location }) {
     city: location.city,
     state: location.state,
     pincode: location.pincode,
+    latitude: location.lat ? Number(location.lat) : null,
+    longitude: location.lng ? Number(location.lng) : null,
   };
 
   const res = await fetch(`${BASE_URL}/donor/register`, {

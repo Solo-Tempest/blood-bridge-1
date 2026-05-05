@@ -1,6 +1,14 @@
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { getHospitalProfile, getDocuments, uploadDocument, getBloodRequests, createBloodRequest, cancelBloodRequest } from "../api/auth";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
 
 const HCtx = createContext(null);
 const useH = () => useContext(HCtx);
@@ -173,6 +181,22 @@ const Ico = {
 
 const lbl={fontSize:10.5,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".6px",marginBottom:5,display:"block"};
 const val={fontSize:14,fontWeight:500,color:"#1a2332"};
+
+/* Stable field component — defined at module level so React never remounts it on re-render */
+function EditableField({label,id,type="text",editing,form,setForm,children}){
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <span style={lbl}>{label}</span>
+      {children
+        ? editing?children:<span style={val}>{form[id]||"—"}</span>
+        : editing
+          ? <input type={type} className="inp-plain" value={form[id]||""} onChange={e=>setForm(f=>({...f,[id]:e.target.value}))}/>
+          : <span style={val}>{form[id]||"—"}</span>
+      }
+    </div>
+  );
+}
+
 const urgencyColor={normal:"#15803d",urgent:"#a16207",critical:"#dc2626"};
 const urgencyBg={normal:"#dcfce7",urgent:"#fef9c3",critical:"#fee2e2"};
 const urgencyBadge={normal:"badge-green",urgent:"badge-amber",critical:"badge-red"};
@@ -195,6 +219,132 @@ function MapPreview({city,state,lat,lng}){
     <div style={{borderRadius:12,overflow:"hidden",border:"1.5px solid #e2e8f0",height:100,background:"linear-gradient(135deg,#eff6ff,#f0fdfa)",display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
       <div style={{position:"absolute",inset:0,opacity:.06,backgroundImage:"repeating-linear-gradient(0deg,#1d6fb8 0,#1d6fb8 1px,transparent 1px,transparent 32px),repeating-linear-gradient(90deg,#1d6fb8 0,#1d6fb8 1px,transparent 1px,transparent 32px)"}}/>
       <div style={{textAlign:"center",zIndex:1}}><div style={{fontSize:24}}>🗺️</div><div style={{fontSize:12,color:"#1d6fb8",fontWeight:700,marginTop:3}}>{city}, {state}</div>{lat&&<div style={{fontSize:10.5,color:"#94a3b8",marginTop:1}}>{lat}, {lng}</div>}</div>
+    </div>
+  );
+}
+
+/* ── Interactive Location Map Picker ── */
+function LocationMapPicker({ lat, lng, onChange }) {
+  const mapDivRef = useRef(null);
+  const mapRef    = useRef(null);
+  const markerRef = useRef(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching,   setSearching]   = useState(false);
+  const [searchErr,   setSearchErr]   = useState("");
+  const [locating,    setLocating]    = useState(false);
+  const [geoErr,      setGeoErr]      = useState("");
+
+  useEffect(() => {
+    if (!mapDivRef.current || mapRef.current) return;
+    const center = lat && lng ? [Number(lat), Number(lng)] : [20.5937, 78.9629];
+    const map = L.map(mapDivRef.current, { center, zoom: lat ? 14 : 5 });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(map);
+    map.on("click", e => {
+      placeOrMoveMarker(e.latlng.lat, e.latlng.lng, map);
+      reverseGeocode(e.latlng.lat, e.latlng.lng);
+    });
+    if (lat && lng) placeOrMoveMarker(Number(lat), Number(lng), map);
+    mapRef.current = map;
+    return () => { map.remove(); mapRef.current = null; markerRef.current = null; };
+  }, []);
+
+  const placeOrMoveMarker = (lat, lng, mapInstance) => {
+    const map = mapInstance || mapRef.current;
+    if (!map) return;
+    if (markerRef.current) {
+      markerRef.current.setLatLng([lat, lng]);
+    } else {
+      const marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+      marker.on("dragend", () => {
+        const pos = marker.getLatLng();
+        reverseGeocode(pos.lat, pos.lng);
+      });
+      markerRef.current = marker;
+    }
+    map.flyTo([lat, lng], Math.max(map.getZoom(), 14));
+  };
+
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+        { headers: { "User-Agent": "BloodBridge/1.0" } }
+      );
+      const json = await res.json();
+      const a = json.address || {};
+      onChange({
+        lat: String(lat), lng: String(lng),
+        city:    a.city || a.town || a.village || a.county || "",
+        state:   a.state || "",
+        pincode: a.postcode || "",
+      });
+      setSearchQuery(json.display_name || "");
+    } catch {
+      onChange({ lat: String(lat), lng: String(lng) });
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setSearching(true); setSearchErr("");
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1&countrycodes=in`,
+        { headers: { "User-Agent": "BloodBridge/1.0" } }
+      );
+      const json = await res.json();
+      if (!json.length) { setSearchErr("Location not found."); return; }
+      const { lat: la, lon } = json[0];
+      placeOrMoveMarker(Number(la), Number(lon));
+      reverseGeocode(Number(la), Number(lon));
+    } catch { setSearchErr("Search failed."); }
+    finally { setSearching(false); }
+  };
+
+  const handleCurrentLocation = () => {
+    if (!navigator.geolocation) { setGeoErr("Geolocation not supported."); return; }
+    setLocating(true); setGeoErr("");
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        placeOrMoveMarker(pos.coords.latitude, pos.coords.longitude);
+        reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+        setLocating(false);
+      },
+      err => {
+        setLocating(false);
+        setGeoErr(err.code === 1 ? "Permission denied. Allow location in browser settings." : "Could not get location.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
+      <div style={{display:"flex",gap:8}}>
+        <input className="inp-plain" style={{flex:1}} placeholder="Search address or area…"
+          value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&handleSearch()} />
+        <button type="button" className="btn-primary" onClick={handleSearch} disabled={searching}
+          style={{flexShrink:0,padding:"8px 18px"}}>
+          {searching?"…":"Go"}
+        </button>
+      </div>
+      {searchErr&&<span style={{fontSize:11.5,color:"#dc2626"}}>{searchErr}</span>}
+      <button type="button" onClick={handleCurrentLocation} disabled={locating}
+        style={{width:"100%",padding:"9px 16px",borderRadius:9,border:"1.5px dashed",borderColor:locating?"#fbbf24":"#93c5fd",background:locating?"#fef9c3":"#f0f7ff",color:locating?"#a16207":"#1d6fb8",fontSize:13,fontWeight:600,cursor:locating?"not-allowed":"pointer",fontFamily:"'Plus Jakarta Sans',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+        {locating?"⏳ Detecting location…":"📡 Use My Current Location"}
+      </button>
+      {geoErr&&<span style={{fontSize:11.5,color:"#dc2626"}}>{geoErr}</span>}
+      <div ref={mapDivRef} style={{height:280,borderRadius:12,overflow:"hidden",border:"1.5px solid #e2e8f0"}} />
+      {lat&&lng&&(
+        <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:9,padding:"8px 12px",fontSize:12.5,color:"#15803d",fontWeight:600,display:"flex",alignItems:"center",gap:6}}>
+          📍 {Number(lat).toFixed(5)}, {Number(lng).toFixed(5)}
+          <span style={{color:"#16a34a",marginLeft:"auto"}}>Location pinned ✓</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -271,6 +421,11 @@ function TopBar({page,setPage,onMenuClick}){
 /* ── DASHBOARD ── */
 function DashboardPage({setPage}){
   const H = useH();
+  const [docs,setDocs] = useState([]);
+  useEffect(()=>{
+    const token = localStorage.getItem("bb_token");
+    if(token) getDocuments(token).then(setDocs).catch(()=>{});
+  },[]);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
       <div className="fu" style={{background:"linear-gradient(135deg,#1d6fb8,#0284c7,#0ea5e9)",borderRadius:16,padding:"20px 22px",color:"#fff",position:"relative",overflow:"hidden"}}>
@@ -322,13 +477,18 @@ function DashboardPage({setPage}){
         <div className="card fu d4">
           <SectionHead title="Document Status" icon="📄" onEdit={()=>setPage("docs")} editLabel="View all"/>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {DOCS.map(d=>(
-              <div key={d.id} className="doc-card">
-                <span style={{fontSize:18,flexShrink:0}}>{d.icon}</span>
-                <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:600,color:"#1a2332",marginBottom:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{d.name}</div><div style={{fontSize:10.5,color:"#94a3b8"}}>{new Date(d.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div></div>
-                <StatusBadge status={d.status}/>
-              </div>
-            ))}
+            {docs.length===0?(
+              <div style={{textAlign:"center",padding:"12px 0",color:"#94a3b8",fontSize:12.5}}>No documents uploaded yet</div>
+            ):docs.slice(0,3).map(d=>{
+              const meta=DOC_META[d.type]||{label:d.type,icon:"📄"};
+              return(
+                <div key={d.id} className="doc-card">
+                  <span style={{fontSize:18,flexShrink:0}}>{meta.icon}</span>
+                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:600,color:"#1a2332",marginBottom:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{meta.label}</div><div style={{fontSize:10.5,color:"#94a3b8"}}>{new Date(d.uploadedAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div></div>
+                  <StatusBadge status={(d.status||"").toLowerCase()}/>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -344,12 +504,7 @@ function ProfilePage(){
   const [saved,setSaved]=useState(false);
   function save(){setEditing(false);setSaved(true);setTimeout(()=>setSaved(false),3000);}
   const types=["Government","Private","NGO / Trust","Blood Bank Only","Multi-Specialty"];
-  const F=({label,id,type="text",children})=>(
-    <div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <span style={lbl}>{label}</span>
-      {children?editing?children:<span style={val}>{form[id]||"—"}</span>:editing?<input type={type} className="inp-plain" value={form[id]||""} onChange={e=>setForm(f=>({...f,[id]:e.target.value}))}/>:<span style={val}>{form[id]||"—"}</span>}
-    </div>
-  );
+  const fp={editing,form,setForm};
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
       {saved&&<div className="fu" style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#15803d",fontWeight:600}}>✅ Profile saved!</div>}
@@ -361,18 +516,41 @@ function ProfilePage(){
           </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14}}>
-          <F label="Hospital Name" id="name"/><F label="Registration / License ID" id="regNo"/>
-          <F label="Hospital Type" id="type">{editing&&<select className="inp-plain" value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}>{types.map(t=><option key={t}>{t}</option>)}</select>}</F>
-          <F label="Year Established" id="year" type="number"/><F label="Website URL" id="website"/>
+          <EditableField label="Hospital Name" id="name" {...fp}/>
+          <EditableField label="Registration / License ID" id="regNo" {...fp}/>
+          <EditableField label="Hospital Type" id="type" {...fp}>{editing&&<select className="inp-plain" value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}>{types.map(t=><option key={t}>{t}</option>)}</select>}</EditableField>
+          <EditableField label="Year Established" id="year" type="number" {...fp}/>
+          <EditableField label="Website URL" id="website" {...fp}/>
         </div>
       </div>
       <div className="card fu d1">
         <SectionHead title="Address Details" icon="📍"/>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:14,marginBottom:14}}>
-          <div style={{gridColumn:"1/-1"}}><F label="Street Address" id="street"/></div>
-          <F label="Area / Locality" id="area"/><F label="City" id="city"/><F label="State" id="state"/><F label="Pincode" id="pincode"/><F label="Landmark" id="landmark"/><F label="Latitude" id="lat"/><F label="Longitude" id="lng"/>
+          <div style={{gridColumn:"1/-1"}}><EditableField label="Street Address" id="street" {...fp}/></div>
+          <EditableField label="Area / Locality" id="area" {...fp}/>
+          <EditableField label="City" id="city" {...fp}/>
+          <EditableField label="State" id="state" {...fp}/>
+          <EditableField label="Pincode" id="pincode" {...fp}/>
+          <EditableField label="Landmark" id="landmark" {...fp}/>
+          {!editing&&<EditableField label="Latitude" id="lat" {...fp}/>}
+          {!editing&&<EditableField label="Longitude" id="lng" {...fp}/>}
         </div>
-        <MapPreview city={form.city} state={form.state} lat={form.lat} lng={form.lng}/>
+        {editing ? (
+          <LocationMapPicker
+            lat={form.lat}
+            lng={form.lng}
+            onChange={({lat,lng,city,state,pincode})=>setForm(f=>({
+              ...f,
+              lat: lat||f.lat,
+              lng: lng||f.lng,
+              city: city||f.city,
+              state: state||f.state,
+              pincode: pincode||f.pincode,
+            }))}
+          />
+        ) : (
+          <MapPreview city={form.city} state={form.state} lat={form.lat} lng={form.lng}/>
+        )}
       </div>
     </div>
   );
@@ -541,12 +719,7 @@ function ContactPage(){
   const [form,setForm]=useState({contact:H.contact,role:H.role,phone:H.phone,altPhone:H.altPhone,email:H.email});
   const [saved,setSaved]=useState(false);
   function save(){setEditing(false);setSaved(true);setTimeout(()=>setSaved(false),3000);}
-  const F=({label,id,type="text"})=>(
-    <div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <span style={lbl}>{label}</span>
-      {editing?<input type={type} className="inp-plain" value={form[id]||""} onChange={e=>setForm(f=>({...f,[id]:e.target.value}))}/>:<span style={val}>{form[id]||"—"}</span>}
-    </div>
-  );
+  const fp={editing,form,setForm};
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
       {saved&&<div className="fu" style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#15803d",fontWeight:600}}>✅ Contact info saved!</div>}
@@ -556,9 +729,11 @@ function ContactPage(){
           <div style={{display:"flex",gap:8}}>{editing?<><button className="btn-ghost" onClick={()=>{setEditing(false);setForm({contact:H.contact,role:H.role,phone:H.phone,altPhone:H.altPhone,email:H.email});}}>Cancel</button><button className="btn-primary" onClick={save}>Save</button></>:<button className="btn-ghost" onClick={()=>setEditing(true)} style={{display:"flex",alignItems:"center",gap:5}}>{Ico.edit} Edit</button>}</div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14}}>
-          <F label="Primary Contact Person" id="contact"/><F label="Role / Designation" id="role"/>
-          <F label="Primary Phone Number" id="phone"/><F label="Alternate Phone" id="altPhone"/>
-          <div style={{gridColumn:"1/-1"}}><F label="Email Address" id="email" type="email"/></div>
+          <EditableField label="Primary Contact Person" id="contact" {...fp}/>
+          <EditableField label="Role / Designation" id="role" {...fp}/>
+          <EditableField label="Primary Phone Number" id="phone" {...fp}/>
+          <EditableField label="Alternate Phone" id="altPhone" {...fp}/>
+          <div style={{gridColumn:"1/-1"}}><EditableField label="Email Address" id="email" type="email" {...fp}/></div>
         </div>
       </div>
     </div>

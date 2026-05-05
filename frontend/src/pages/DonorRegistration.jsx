@@ -1,6 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { donorRegister } from "../api/auth";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+// Fix marker icons broken by Vite's asset bundling
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const GENDERS = ["Male", "Female", "Other", "Prefer not to say"];
@@ -330,34 +340,260 @@ function Step2({ data, setData, errors }) {
 }
 
 function Step3({ data, setData, errors }) {
-  const [gpsStatus, setGpsStatus] = useState("idle");
+  const mapDivRef = useRef(null);
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
+  const [searchQuery, setSearchQuery] = useState(data.address || "");
+  const [searching, setSearching] = useState(false);
+  const [searchErr, setSearchErr] = useState("");
+  const [locating, setLocating] = useState(false);
+  const [geoErr, setGeoErr] = useState("");
 
-  const handleGPS = () => {
-    setGpsStatus("loading");
-    navigator.geolocation?.getCurrentPosition(
-      () => setGpsStatus("success"),
-      () => setGpsStatus("error")
+  // Initialize Leaflet map on mount
+  useEffect(() => {
+    if (!mapDivRef.current || mapRef.current) return;
+
+    const center = data.lat && data.lng
+      ? [Number(data.lat), Number(data.lng)]
+      : [20.5937, 78.9629];
+
+    const map = L.map(mapDivRef.current, {
+      center,
+      zoom: data.lat ? 14 : 5,
+      zoomControl: true,
+    });
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(map);
+
+    map.on("click", e => {
+      const { lat, lng } = e.latlng;
+      placeOrMoveMarker(lat, lng, map);
+      reverseGeocode(lat, lng);
+    });
+
+    if (data.lat && data.lng) {
+      placeOrMoveMarker(Number(data.lat), Number(data.lng), map);
+    }
+
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      markerRef.current = null;
+    };
+  }, []);
+
+  const placeOrMoveMarker = (lat, lng, mapInstance) => {
+    const map = mapInstance || mapRef.current;
+    if (!map) return;
+    if (markerRef.current) {
+      markerRef.current.setLatLng([lat, lng]);
+    } else {
+      const marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+      marker.on("dragend", () => {
+        const pos = marker.getLatLng();
+        reverseGeocode(pos.lat, pos.lng);
+      });
+      markerRef.current = marker;
+    }
+    map.flyTo([lat, lng], Math.max(map.getZoom(), 14));
+  };
+
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+        { headers: { "User-Agent": "BloodBridge/1.0" } }
+      );
+      const json = await res.json();
+      if (json.address) {
+        const a = json.address;
+        const city = a.city || a.town || a.village || a.county || "";
+        const rawState = a.state || "";
+        const state = INDIAN_STATES.find(
+          s => s.toLowerCase() === rawState.toLowerCase()
+        ) || "";
+        const pincode = a.postcode || "";
+        const address = json.display_name || "";
+        setData(d => ({
+          ...d,
+          lat: String(lat).includes(".") ? String(Number(lat).toFixed(6)) : lat,
+          lng: String(lng).includes(".") ? String(Number(lng).toFixed(6)) : lng,
+          address,
+          city: city || d.city,
+          state: state || d.state,
+          pincode: pincode || d.pincode,
+        }));
+        setSearchQuery(address);
+      } else {
+        setData(d => ({ ...d, lat: Number(lat).toFixed(6), lng: Number(lng).toFixed(6) }));
+      }
+    } catch {
+      setData(d => ({ ...d, lat: Number(lat).toFixed(6), lng: Number(lng).toFixed(6) }));
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    setSearchErr("");
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&countrycodes=in&limit=1`,
+        { headers: { "User-Agent": "BloodBridge/1.0" } }
+      );
+      const results = await res.json();
+      if (results.length > 0) {
+        const lat = Number(results[0].lat);
+        const lng = Number(results[0].lon);
+        placeOrMoveMarker(lat, lng);
+        reverseGeocode(lat, lng);
+      } else {
+        setSearchErr("Location not found. Try a more specific name.");
+      }
+    } catch {
+      setSearchErr("Search failed. Please click directly on the map instead.");
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setGeoErr("Your browser doesn't support location access.");
+      return;
+    }
+    setLocating(true);
+    setGeoErr("");
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        placeOrMoveMarker(lat, lng);
+        reverseGeocode(lat, lng);
+        setLocating(false);
+      },
+      err => {
+        setLocating(false);
+        if (err.code === 1) setGeoErr("Location permission denied. Please allow access in your browser.");
+        else setGeoErr("Could not get your location. Try searching instead.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
   return (
-    <div className="space-y-5 animate-fadeIn">
+    <div className="space-y-4 animate-fadeIn">
       <div>
         <h2 className="text-2xl font-bold text-gray-800" style={{ fontFamily: "'Playfair Display', serif" }}>
           Your Location
         </h2>
-        <p className="text-sm text-gray-500 mt-1">Help donors and recipients find you</p>
+        <p className="text-sm text-gray-500 mt-1">
+          Search your area or click the map to pin your exact spot
+        </p>
       </div>
 
-      <InputField label="City" error={errors.city}>
-        <FieldIcon>🏙️</FieldIcon>
-        <input
-          className={inputBase}
-          placeholder="e.g. Patna"
-          value={data.city}
-          onChange={e => setData({ ...data, city: e.target.value })}
-        />
-      </InputField>
+      {/* Address search */}
+      <div>
+        <label className={labelBase}>Search Address</label>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <FieldIcon>🔍</FieldIcon>
+            <input
+              type="text"
+              className={inputBase}
+              placeholder="e.g. Rajendra Nagar, Patna, Bihar"
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); setSearchErr(""); }}
+              onKeyDown={e => e.key === "Enter" && handleSearch()}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleSearch}
+            disabled={searching || !searchQuery.trim()}
+            className="px-5 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-all duration-200 flex-shrink-0 active:scale-95"
+          >
+            {searching ? "…" : "Go"}
+          </button>
+        </div>
+        {searchErr && <p className={errorBase}><span>⚠</span> {searchErr}</p>}
+        {errors.address && !searchErr && <p className={errorBase}><span>⚠</span> {errors.address}</p>}
+      </div>
+
+      {/* Current location button */}
+      <button
+        type="button"
+        onClick={handleCurrentLocation}
+        disabled={locating}
+        className={`w-full py-2.5 rounded-xl border-2 border-dashed text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-300
+          ${locating
+            ? "border-amber-300 bg-amber-50 text-amber-600 animate-pulse cursor-wait"
+            : "border-red-200 bg-red-50 text-red-500 hover:bg-red-100 hover:border-red-300 active:scale-95"
+          }`}
+      >
+        {locating ? <><span>⏳</span> Detecting your location…</> : <><span>📡</span> Use My Current Location</>}
+      </button>
+      {geoErr && <p className={`${errorBase} -mt-2`}><span>⚠</span> {geoErr}</p>}
+
+      {/* Leaflet map */}
+      <div className="rounded-2xl overflow-hidden border border-red-100 shadow-sm">
+        <div ref={mapDivRef} style={{ width: "100%", height: 280 }} />
+      </div>
+
+      <p className="text-xs text-gray-400 text-center">
+        Click anywhere on the map or drag the pin to fine-tune your location
+      </p>
+
+      {/* Coordinates badge */}
+      {data.lat && data.lng && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">
+          <span className="text-base">📍</span>
+          <span className="text-xs font-mono text-green-700">
+            {Number(data.lat).toFixed(5)}, {Number(data.lng).toFixed(5)}
+          </span>
+          <span className="ml-auto text-xs text-green-600 font-semibold">Location set ✓</span>
+        </div>
+      )}
+
+      {/* Selected address — read-only */}
+      {data.address && (
+        <InputField label="Selected Address">
+          <FieldIcon>📍</FieldIcon>
+          <input
+            className={`${inputBase} bg-gray-50 text-gray-500 cursor-default`}
+            value={data.address}
+            readOnly
+          />
+        </InputField>
+      )}
+
+      {/* Auto-filled from reverse geocode — still manually editable */}
+      <div className="grid grid-cols-2 gap-4">
+        <InputField label="City" error={errors.city}>
+          <FieldIcon>🏙️</FieldIcon>
+          <input
+            className={inputBase}
+            placeholder="e.g. Patna"
+            value={data.city}
+            onChange={e => setData({ ...data, city: e.target.value })}
+          />
+        </InputField>
+        <InputField label="Pincode" error={errors.pincode}>
+          <FieldIcon>🔢</FieldIcon>
+          <input
+            className={inputBase}
+            placeholder="6-digit"
+            maxLength={6}
+            value={data.pincode}
+            onChange={e => setData({ ...data, pincode: e.target.value.replace(/\D/g, "") })}
+          />
+        </InputField>
+      </div>
 
       <InputField label="State" error={errors.state}>
         <FieldIcon>🗺️</FieldIcon>
@@ -370,36 +606,6 @@ function Step3({ data, setData, errors }) {
           {INDIAN_STATES.map(s => <option key={s}>{s}</option>)}
         </select>
       </InputField>
-
-      <InputField label="Pincode" error={errors.pincode}>
-        <FieldIcon>🔢</FieldIcon>
-        <input
-          className={inputBase}
-          placeholder="6-digit pincode"
-          maxLength={6}
-          value={data.pincode}
-          onChange={e => setData({ ...data, pincode: e.target.value.replace(/\D/g, "") })}
-        />
-      </InputField>
-
-      <div>
-        <label className={labelBase}>GPS Location (Optional)</label>
-        <button
-          type="button"
-          onClick={handleGPS}
-          className={`w-full py-3 rounded-xl border-2 border-dashed text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-300
-            ${gpsStatus === "success" ? "border-green-400 bg-green-50 text-green-600" : ""}
-            ${gpsStatus === "error" ? "border-red-300 bg-red-50 text-red-500" : ""}
-            ${gpsStatus === "loading" ? "border-amber-300 bg-amber-50 text-amber-600 animate-pulse" : ""}
-            ${gpsStatus === "idle" ? "border-red-200 bg-red-50 text-red-500 hover:bg-red-100" : ""}
-          `}
-        >
-          {gpsStatus === "idle" && <><span>📡</span> Detect My Location</>}
-          {gpsStatus === "loading" && <><span>⏳</span> Detecting…</>}
-          {gpsStatus === "success" && <><span>✅</span> Location Detected!</>}
-          {gpsStatus === "error" && <><span>❌</span> Permission Denied</>}
-        </button>
-      </div>
     </div>
   );
 }
@@ -535,9 +741,12 @@ function validate(step, formData) {
     if (!formData.medical.isHealthy) errs.isHealthy = "Please confirm you are currently healthy";
   }
   if (step === 3) {
+    if (!formData.location.address && !formData.location.city.trim())
+      errs.address = "Please search or click the map to set your location";
     if (!formData.location.city.trim()) errs.city = "City is required";
     if (!formData.location.state) errs.state = "State is required";
-    if (!formData.location.pincode || formData.location.pincode.length !== 6) errs.pincode = "Enter a valid 6-digit pincode";
+    if (!formData.location.pincode || formData.location.pincode.length !== 6)
+      errs.pincode = "Enter a valid 6-digit pincode";
   }
   return errs;
 }
@@ -553,7 +762,7 @@ export default function DonorRegistration() {
 
   const [personal, setPersonal] = useState({ name: "", dob: "", gender: "", phone: "", email: "", password: "", confirmPassword: "" });
   const [medical, setMedical] = useState({ bloodGroup: "", weight: "", hasDisease: false, disease: "", lastDonation: "", neverDonated: false, isHealthy: false });
-  const [location, setLocation] = useState({ city: "", state: "", pincode: "" });
+  const [location, setLocation] = useState({ city: "", state: "", pincode: "", address: "", lat: "", lng: "" });
   const [otpData, setOtpData] = useState({ otp: "", otpError: "" });
 
   const formData = { personal, medical, location };

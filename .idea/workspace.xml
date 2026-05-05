@@ -4,12 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="900ede8d-4bf2-4552-badd-6108bc406569" name="Changes" comment="hospital authentication and its dashboard is open after succesfull login 1">
+    <list default="true" id="900ede8d-4bf2-4552-badd-6108bc406569" name="Changes" comment="Footer, Navbar,&#10;  DonorRegistration, PrivacyPolicy,&#10;  TermsAndConditions">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/App.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/App.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/components/layout/Footer.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/layout/Footer.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/components/layout/Navbar.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/layout/Navbar.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/api/auth.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/api/auth.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/pages/DonorRegistration.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/DonorRegistration.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/pages/HospitalDashboard.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/HospitalDashboard.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/pages/HospitalRegistration.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/HospitalRegistration.jsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -157,7 +159,15 @@
       <option name="project" value="LOCAL" />
       <updated>1777181079069</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="Footer, Navbar,&#10;  DonorRegistration, PrivacyPolicy,&#10;  TermsAndConditions">
+      <option name="closed" value="true" />
+      <created>1777443311943</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1777443311943</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
@@ -169,6 +179,7 @@
     <MESSAGE value="dono frontend,backend and database is connected" />
     <MESSAGE value="hospital authentication and its dashboard is open after succesfull login" />
     <MESSAGE value="hospital authentication and its dashboard is open after succesfull login 1" />
-    <option name="LAST_COMMIT_MESSAGE" value="hospital authentication and its dashboard is open after succesfull login 1" />
+    <MESSAGE value="Footer, Navbar,&#10;  DonorRegistration, PrivacyPolicy,&#10;  TermsAndConditions" />
+    <option name="LAST_COMMIT_MESSAGE" value="Footer, Navbar,&#10;  DonorRegistration, PrivacyPolicy,&#10;  TermsAndConditions" />
   </component>
 </project>
