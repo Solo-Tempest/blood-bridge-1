@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { hospitalLogin, sendHospitalOtp, verifyHospitalOtp } from "../api/auth";
+import { signInWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
+import { auth } from "../firebase";
+import { hospitalLogin, hospitalPhoneVerifiedLogin } from "../api/auth";
 
 /* ─── Global Styles ───────────────────────────────────────────────────── */
 const GlobalStyles = () => (
@@ -170,12 +172,13 @@ export default function HospitalLogin() {
   const [cardIn,     setCardIn]     = useState(false);
 
   // OTP mode
-  const [phone,        setPhone]        = useState("");
-  const [otpSent,      setOtpSent]      = useState(false);
-  const [otp,          setOtp]          = useState("");
-  const [receivedOtp,  setReceivedOtp]  = useState("");
-  const [resend,       setResend]       = useState(0);
-  const [otpError,     setOtpError]     = useState("");
+  const [phone,              setPhone]              = useState("");
+  const [otpSent,            setOtpSent]            = useState(false);
+  const [otp,                setOtp]                = useState("");
+  const [confirmationResult, setConfirmationResult] = useState(null);
+  const recaptchaRef                               = useRef(null);
+  const [resend,             setResend]             = useState(0);
+  const [otpError,           setOtpError]           = useState("");
 
   useEffect(() => { requestAnimationFrame(() => setCardIn(true)); }, []);
 
@@ -186,13 +189,27 @@ export default function HospitalLogin() {
     return () => clearTimeout(t);
   }, [resend]);
 
+  // Initialize reCAPTCHA once the OTP tab is active
+  useEffect(() => {
+    if (mode !== "otp" || otpSent) return;
+    recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-hospital", { size: "invisible" });
+    return () => {
+      recaptchaRef.current?.clear();
+      recaptchaRef.current = null;
+    };
+  }, [mode, otpSent]);
+
   async function startResend() {
     setOtp(""); setOtpError(""); setResend(30);
     try {
-      const data = await sendHospitalOtp(phone);
-      setReceivedOtp(data.otp);
+      recaptchaRef.current?.clear();
+      recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-hospital", { size: "invisible" });
+      const result = await signInWithPhoneNumber(auth, "+91" + phone, recaptchaRef.current);
+      setConfirmationResult(result);
     } catch (err) {
-      setOtpError(err.message);
+      setOtpError(err.message || "Failed to resend OTP.");
+      recaptchaRef.current?.clear();
+      recaptchaRef.current = null;
     }
   }
 
@@ -228,12 +245,16 @@ export default function HospitalLogin() {
     setLoading(true);
     setApiError("");
     try {
-      const data = await sendHospitalOtp(phone);
-      setReceivedOtp(data.otp);
+      const verifier = recaptchaRef.current ?? new RecaptchaVerifier(auth, "recaptcha-hospital", { size: "invisible" });
+      recaptchaRef.current = verifier;
+      const result = await signInWithPhoneNumber(auth, "+91" + phone, verifier);
+      setConfirmationResult(result);
       setOtpSent(true);
       setResend(30);
     } catch (err) {
-      setApiError(err.message);
+      setApiError(err.message || "Failed to send OTP. Please try again.");
+      recaptchaRef.current?.clear();
+      recaptchaRef.current = null;
     } finally {
       setLoading(false);
     }
@@ -245,12 +266,17 @@ export default function HospitalLogin() {
       setLoading(true);
       setApiError("");
       try {
-        const data = await verifyHospitalOtp(phone, otp);
+        await confirmationResult.confirm(otp);
+        const data = await hospitalPhoneVerifiedLogin(phone);
         localStorage.setItem("bb_token", data.token);
         localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
         setSuccess(true);
       } catch (err) {
-        setOtpError(err.message);
+        if (err.code === "auth/invalid-verification-code") {
+          setOtpError("Invalid OTP. Please check and try again.");
+        } else {
+          setOtpError(err.message || "Verification failed. Please try again.");
+        }
       } finally {
         setLoading(false);
       }
@@ -318,6 +344,7 @@ export default function HospitalLogin() {
   return (
     <>
       <GlobalStyles />
+      <div id="recaptcha-hospital" />
       <div className="min-h-screen flex items-center justify-center px-4 pt-[80px] pb-12" style={BG}>
 
         <div className="w-full max-w-md transition-all duration-700"
@@ -461,13 +488,11 @@ export default function HospitalLogin() {
                       </button>
                     </div>
 
-                    {receivedOtp && (
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-center">
-                        <p className="text-[11px] text-amber-600 font-bold uppercase tracking-widest mb-1">Your OTP (demo)</p>
-                        <p className="text-2xl font-bold text-amber-700 tracking-[0.4em] font-mono">{receivedOtp}</p>
-                        <p className="text-[10px] text-amber-500 mt-1">Valid for 5 minutes</p>
-                      </div>
-                    )}
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
+                      <p className="text-[11px] text-blue-600 font-bold uppercase tracking-widest mb-1">OTP Sent via Firebase</p>
+                      <p className="text-sm text-blue-700 font-medium">Check your phone for the 6-digit SMS</p>
+                      <p className="text-[10px] text-blue-500 mt-1">Valid for a few minutes · Do not share it</p>
+                    </div>
 
                     <OtpBoxes value={otp} onChange={v => { setOtp(v); setOtpError(""); }} error={otpError} />
 

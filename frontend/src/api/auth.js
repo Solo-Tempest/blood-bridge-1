@@ -40,21 +40,12 @@ export async function donorLogin(identifier, password) {
   return res.json();
 }
 
-export async function sendDonorOtp(phone) {
-  const res = await fetch(`${BASE_URL}/donor/otp/send`, {
+// Firebase handles OTP send/verify client-side; these call the backend only to issue an app JWT
+export async function donorPhoneVerifiedLogin(phone) {
+  const res = await fetch(`${BASE_URL}/donor/phone/verified`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phone }),
-  });
-  if (!res.ok) throw new Error(await parseError(res));
-  return res.json();
-}
-
-export async function verifyDonorOtp(phone, otp) {
-  const res = await fetch(`${BASE_URL}/donor/otp/verify`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone, otp }),
   });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
@@ -153,21 +144,11 @@ export async function hospitalLogin(identifier, password) {
   return res.json();
 }
 
-export async function sendHospitalOtp(phone) {
-  const res = await fetch(`${BASE_URL}/hospital/otp/send`, {
+export async function hospitalPhoneVerifiedLogin(phone) {
+  const res = await fetch(`${BASE_URL}/hospital/phone/verified`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phone }),
-  });
-  if (!res.ok) throw new Error(await parseError(res));
-  return res.json();
-}
-
-export async function verifyHospitalOtp(phone, otp) {
-  const res = await fetch(`${BASE_URL}/hospital/otp/verify`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone, otp }),
   });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();

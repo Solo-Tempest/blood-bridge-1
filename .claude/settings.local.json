@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(npm install *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "PowerShell(where.exe mvn; where.exe mvn.cmd; $env:M2_HOME; $env:MAVEN_HOME)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\adity\\\\Desktop\\\\Blood bridge\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\adity\\\\Desktop\\\\Blood bridge\" -Recurse -Force)",
+      "Bash(Select-Object FullName, PSIsContainer)",
+      "Bash(Sort-Object FullName)",
+      "Bash(Format-Table -AutoSize)"
     ]
   }
 }

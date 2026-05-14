@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { donorRegister } from "../api/auth";
+import { signInWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
+import { auth } from "../firebase";
+import { donorRegister, donorPhoneVerifiedLogin } from "../api/auth";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -11,6 +13,11 @@ L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
+
+function cleanPhone(phone) {
+  const raw = phone.replace(/\D/g, "");
+  return raw.startsWith("91") && raw.length === 12 ? raw.slice(2) : raw.slice(-10);
+}
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const GENDERS = ["Male", "Female", "Other", "Prefer not to say"];
@@ -610,31 +617,7 @@ function Step3({ data, setData, errors }) {
   );
 }
 
-function Step4({ data, setData, errors, otpSent, setOtpSent, verified, setVerified, phone }) {
-  const [resendTimer, setResendTimer] = useState(0);
-  const timerRef = useRef(null);
-
-  const startTimer = () => {
-    setResendTimer(30);
-    clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      setResendTimer(t => {
-        if (t <= 1) { clearInterval(timerRef.current); return 0; }
-        return t - 1;
-      });
-    }, 1000);
-  };
-
-  const sendOTP = () => {
-    setOtpSent(true);
-    startTimer();
-  };
-
-  const verify = () => {
-    if (data.otp === "123456") setVerified(true);
-    else setData({ ...data, otpError: "Invalid OTP. Try 123456 for demo." });
-  };
-
+function Step4({ data, setData, otpSent, loading, apiError, resendTimer, onSendOtp, onResend, onVerifyOtp, verified, phone }) {
   if (verified) {
     return (
       <div className="flex flex-col items-center justify-center py-8 gap-4 animate-fadeIn">
@@ -642,7 +625,7 @@ function Step4({ data, setData, errors, otpSent, setOtpSent, verified, setVerifi
         <h2 className="text-2xl font-bold text-gray-800" style={{ fontFamily: "'Playfair Display', serif" }}>
           Verified!
         </h2>
-        <p className="text-sm text-gray-500 text-center">Your phone number has been verified successfully.<br/>You're all set to save lives!</p>
+        <p className="text-sm text-gray-500 text-center">Phone verified successfully.<br/>Completing your registration…</p>
         <div className="mt-4 bg-red-50 border border-red-100 rounded-2xl p-5 w-full text-center">
           <p className="text-xs text-red-400 uppercase tracking-wider font-semibold mb-1">Registration Complete</p>
           <p className="text-sm text-gray-600">Welcome to <span className="font-bold text-red-600">Blood Bridge</span> 🩸</p>
@@ -666,20 +649,31 @@ function Step4({ data, setData, errors, otpSent, setOtpSent, verified, setVerifi
         <div className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-100 rounded-2xl p-6 text-center space-y-4">
           <div className="text-5xl">📲</div>
           <p className="text-sm text-gray-600">Click below to receive your OTP via SMS</p>
+          {apiError && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">⚠ {apiError}</p>
+          )}
           <button
             type="button"
-            onClick={sendOTP}
-            className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-md hover:shadow-lg active:scale-95"
+            onClick={onSendOtp}
+            disabled={loading}
+            className="w-full py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
           >
-            Send OTP
+            {loading ? (
+              <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="3"/><path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z"/></svg> Registering &amp; Sending OTP…</>
+            ) : "Send OTP"}
           </button>
         </div>
       ) : (
         <>
-          <div className="text-center text-xs text-gray-500 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
-            💡 <strong>Demo:</strong> Use <code className="bg-amber-100 px-1 rounded font-mono">123456</code> as OTP
-          </div>
-          <InputField label="Enter OTP" error={data.otpError || errors.otp}>
+          {(
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
+              <p className="text-[11px] text-blue-600 font-bold uppercase tracking-widest mb-1">OTP Sent via Firebase</p>
+              <p className="text-sm text-blue-700 font-medium">Check your phone for the 6-digit SMS</p>
+              <p className="text-[10px] text-blue-500 mt-1">Valid for 5 minutes · Do not share it</p>
+            </div>
+          )}
+
+          <InputField label="Enter OTP" error={data.otpError}>
             <FieldIcon>🔑</FieldIcon>
             <input
               className={`${inputBase} tracking-[0.4em] text-center font-bold text-lg`}
@@ -690,19 +684,25 @@ function Step4({ data, setData, errors, otpSent, setOtpSent, verified, setVerifi
             />
           </InputField>
 
+          {apiError && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">⚠ {apiError}</p>
+          )}
+
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={verify}
-              disabled={data.otp.length !== 6}
-              className="flex-1 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-md hover:shadow-lg active:scale-95"
+              onClick={onVerifyOtp}
+              disabled={data.otp.length !== 6 || loading}
+              className="flex-1 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
             >
-              Verify OTP
+              {loading ? (
+                <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="3"/><path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z"/></svg> Verifying…</>
+              ) : "Verify OTP"}
             </button>
             <button
               type="button"
-              onClick={resendTimer === 0 ? sendOTP : undefined}
-              disabled={resendTimer > 0}
+              onClick={resendTimer === 0 ? onResend : undefined}
+              disabled={resendTimer > 0 || loading}
               className="flex-1 py-3 border-2 border-red-200 text-red-600 hover:bg-red-50 disabled:border-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed rounded-xl font-semibold text-sm transition-all duration-200"
             >
               {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend OTP"}
@@ -757,8 +757,11 @@ export default function DonorRegistration() {
   const [errors, setErrors] = useState({});
   const [otpSent, setOtpSent] = useState(false);
   const [verified, setVerified] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [apiError, setApiError] = useState("");
+  const [confirmationResult, setConfirmationResult] = useState(null);
+  const recaptchaRef = useRef(null);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpApiError, setOtpApiError] = useState("");
+  const [resendTimer, setResendTimer] = useState(0);
 
   const [personal, setPersonal] = useState({ name: "", dob: "", gender: "", phone: "", email: "", password: "", confirmPassword: "" });
   const [medical, setMedical] = useState({ bloodGroup: "", weight: "", hasDisease: false, disease: "", lastDonation: "", neverDonated: false, isHealthy: false });
@@ -766,6 +769,22 @@ export default function DonorRegistration() {
   const [otpData, setOtpData] = useState({ otp: "", otpError: "" });
 
   const formData = { personal, medical, location };
+
+  useEffect(() => {
+    if (!resendTimer) return;
+    const t = setTimeout(() => setResendTimer(r => r - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendTimer]);
+
+  // Initialize reCAPTCHA once step 4 is shown and OTP not yet sent
+  useEffect(() => {
+    if (step !== 4 || otpSent) return;
+    recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-donor-reg", { size: "invisible" });
+    return () => {
+      recaptchaRef.current?.clear();
+      recaptchaRef.current = null;
+    };
+  }, [step, otpSent]);
 
   const next = () => {
     if (step === 4) return;
@@ -779,32 +798,84 @@ export default function DonorRegistration() {
     setStep(s => s - 1);
   };
 
-  const handleComplete = async () => {
-    setSubmitting(true);
-    setApiError("");
+  // Step 4: register the account first, then send OTP via Firebase
+  const handleSendOtp = async () => {
+    setOtpLoading(true);
+    setOtpApiError("");
     try {
-      const data = await donorRegister({ personal, medical, location });
-      localStorage.setItem("bb_token", data.token);
-      localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
-      navigate("/donor");
+      await donorRegister({ personal, medical, location });
     } catch (err) {
-      setApiError(err.message);
+      // Ignore "already registered" errors — user may be retrying after a failed OTP send
+      const msg = err.message.toLowerCase();
+      if (!msg.includes("already") && !msg.includes("exist") && !msg.includes("registered")) {
+        setOtpApiError(err.message);
+        setOtpLoading(false);
+        return;
+      }
+    }
+    try {
+      const phone = cleanPhone(personal.phone);
+      const verifier = recaptchaRef.current ?? new RecaptchaVerifier(auth, "recaptcha-donor-reg", { size: "invisible" });
+      recaptchaRef.current = verifier;
+      const result = await signInWithPhoneNumber(auth, "+91" + phone, verifier);
+      setConfirmationResult(result);
+      setOtpSent(true);
+      setResendTimer(30);
+    } catch (err) {
+      setOtpApiError(err.message || "Failed to send OTP. Please try again.");
+      recaptchaRef.current?.clear();
+      recaptchaRef.current = null;
     } finally {
-      setSubmitting(false);
+      setOtpLoading(false);
     }
   };
 
-  const goBackToEdit = (targetStep = 1) => {
-    setApiError("");
-    setErrors({});
-    setVerified(false);
-    setOtpSent(false);
+  const handleResendOtp = async () => {
+    setOtpApiError("");
     setOtpData({ otp: "", otpError: "" });
-    setStep(targetStep);
+    setResendTimer(30);
+    try {
+      const phone = cleanPhone(personal.phone);
+      recaptchaRef.current?.clear();
+      recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-donor-reg", { size: "invisible" });
+      const result = await signInWithPhoneNumber(auth, "+91" + phone, recaptchaRef.current);
+      setConfirmationResult(result);
+    } catch (err) {
+      setOtpApiError(err.message || "Failed to resend OTP.");
+      recaptchaRef.current?.clear();
+      recaptchaRef.current = null;
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (otpData.otp.length !== 6) {
+      setOtpData(d => ({ ...d, otpError: "Enter the 6-digit OTP" }));
+      return;
+    }
+    setOtpLoading(true);
+    setOtpApiError("");
+    try {
+      await confirmationResult.confirm(otpData.otp);
+      const phone = cleanPhone(personal.phone);
+      const data = await donorPhoneVerifiedLogin(phone);
+      localStorage.setItem("bb_token", data.token);
+      localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
+      setVerified(true);
+      setTimeout(() => navigate("/donor"), 1500);
+    } catch (err) {
+      const msg = err.code === "auth/invalid-verification-code"
+        ? "Invalid OTP. Please check and try again."
+        : (err.message || "Verification failed.");
+      setOtpData(d => ({ ...d, otpError: msg }));
+    } finally {
+      setOtpLoading(false);
+    }
   };
 
   return (
     <>
+      {/* Invisible reCAPTCHA anchor — must always be in the DOM */}
+      <div id="recaptcha-donor-reg" />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
         @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
@@ -847,11 +918,14 @@ export default function DonorRegistration() {
               <Step4
                 data={otpData}
                 setData={setOtpData}
-                errors={errors}
                 otpSent={otpSent}
-                setOtpSent={setOtpSent}
+                loading={otpLoading}
+                apiError={otpApiError}
+                resendTimer={resendTimer}
+                onSendOtp={handleSendOtp}
+                onResend={handleResendOtp}
+                onVerifyOtp={handleVerifyOtp}
                 verified={verified}
-                setVerified={setVerified}
                 phone={personal.phone}
               />
             )}
@@ -876,57 +950,7 @@ export default function DonorRegistration() {
                     Next →
                   </button>
                 )}
-                {step === 4 && !otpSent && <div className="flex-1" />}
               </div>
-            )}
-
-            {verified && (
-              <>
-                {apiError ? (
-                  <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-5 space-y-4">
-                    <div className="flex items-start gap-3">
-                      <span className="text-xl mt-0.5">⚠️</span>
-                      <div>
-                        <p className="text-sm font-semibold text-red-700">Registration failed</p>
-                        <p className="text-xs text-red-500 mt-0.5">{apiError}</p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      Please go back to check and correct your details, then re-verify your OTP to try again.
-                    </p>
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={() => goBackToEdit(1)}
-                        className="flex-1 py-2.5 border-2 border-red-300 text-red-600 rounded-xl font-semibold text-xs hover:bg-red-100 transition-all duration-200 active:scale-95"
-                      >
-                        ← Edit details
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleComplete}
-                        disabled={submitting}
-                        className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5"
-                      >
-                        {submitting ? (
-                          <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="3"/><path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z"/></svg> Retrying…</>
-                        ) : "Retry"}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleComplete}
-                    disabled={submitting}
-                    className="w-full mt-6 py-3.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    {submitting ? (
-                      <><svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="3"/><path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z"/></svg> Registering…</>
-                    ) : "🎉 Complete Registration"}
-                  </button>
-                )}
-              </>
             )}
           </div>
 

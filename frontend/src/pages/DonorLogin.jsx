@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { donorLogin, sendDonorOtp, verifyDonorOtp } from "../api/auth";
+import { signInWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
+import { auth } from "../firebase";
+import { donorLogin, donorPhoneVerifiedLogin } from "../api/auth";
 
 const IconPhone = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
@@ -166,11 +168,12 @@ export default function DonorLogin() {
   const [errors, setErrors]         = useState({});
   const [loading, setLoading]       = useState(false);
   const [apiError, setApiError]     = useState("");
-  const [otpSent, setOtpSent]       = useState(false);
-  const [otp, setOtp]               = useState("");
-  const [receivedOtp, setReceivedOtp] = useState("");
-  const [resend, setResend]         = useState(0);
-  const [cardIn, setCardIn]         = useState(false);
+  const [otpSent, setOtpSent]               = useState(false);
+  const [otp, setOtp]                       = useState("");
+  const [confirmationResult, setConfirmationResult] = useState(null);
+  const recaptchaRef                        = useRef(null);
+  const [resend, setResend]                 = useState(0);
+  const [cardIn, setCardIn]                 = useState(false);
 
   useEffect(() => { requestAnimationFrame(() => setCardIn(true)); }, []);
 
@@ -179,6 +182,16 @@ export default function DonorLogin() {
     const t = setTimeout(() => setResend(r => r - 1), 1000);
     return () => clearTimeout(t);
   }, [resend]);
+
+  // Initialize reCAPTCHA once the OTP tab is active (DOM element is guaranteed to exist)
+  useEffect(() => {
+    if (mode !== "otp" || otpSent) return;
+    recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-donor", { size: "invisible" });
+    return () => {
+      recaptchaRef.current?.clear();
+      recaptchaRef.current = null;
+    };
+  }, [mode, otpSent]);
 
   const idIcon = identifier && isPhone(identifier)
     ? <IconPhone />
@@ -210,12 +223,16 @@ export default function DonorLogin() {
     setLoading(true);
     setApiError("");
     try {
-      const data = await sendDonorOtp(phone);
-      setReceivedOtp(data.otp);
+      const verifier = recaptchaRef.current ?? new RecaptchaVerifier(auth, "recaptcha-donor", { size: "invisible" });
+      recaptchaRef.current = verifier;
+      const result = await signInWithPhoneNumber(auth, "+91" + phone, verifier);
+      setConfirmationResult(result);
       setOtpSent(true);
       setResend(30);
     } catch (err) {
-      setApiError(err.message);
+      setApiError(err.message || "Failed to send OTP. Please try again.");
+      recaptchaRef.current?.clear();
+      recaptchaRef.current = null;
     } finally {
       setLoading(false);
     }
@@ -227,12 +244,17 @@ export default function DonorLogin() {
       setLoading(true);
       setApiError("");
       try {
-        const data = await verifyDonorOtp(phone, otp);
+        await confirmationResult.confirm(otp);
+        const data = await donorPhoneVerifiedLogin(phone);
         localStorage.setItem("bb_token", data.token);
         localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
         navigate("/donor");
       } catch (err) {
-        setApiError(err.message);
+        if (err.code === "auth/invalid-verification-code") {
+          setApiError("Invalid OTP. Please check and try again.");
+        } else {
+          setApiError(err.message || "Verification failed. Please try again.");
+        }
       } finally {
         setLoading(false);
       }
@@ -262,6 +284,7 @@ export default function DonorLogin() {
   return (
     <>
       <PageStyles />
+      <div id="recaptcha-donor" />
       <div className="min-h-screen flex items-center justify-center px-4 py-12 pt-[80px]" style={bgStyle}>
         <Drops />
 
@@ -364,19 +387,17 @@ export default function DonorLogin() {
                         Change
                       </button>
                     </div>
-                    {receivedOtp && (
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-center">
-                        <p className="text-[11px] text-amber-600 font-bold uppercase tracking-widest mb-1">Your OTP (demo)</p>
-                        <p className="text-2xl font-bold text-amber-700 tracking-[0.4em] font-mono">{receivedOtp}</p>
-                        <p className="text-[10px] text-amber-500 mt-1">Valid for 5 minutes</p>
-                      </div>
-                    )}
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
+                      <p className="text-[11px] text-blue-600 font-bold uppercase tracking-widest mb-1">OTP Sent via Firebase</p>
+                      <p className="text-sm text-blue-700 font-medium">Check your phone for the 6-digit SMS</p>
+                      <p className="text-[10px] text-blue-500 mt-1">Valid for a few minutes · Do not share it</p>
+                    </div>
                     <OtpInput value={otp} onChange={setOtp} error={errors.otp} />
                     <div className="text-right">
                       <button
                         type="button"
                         disabled={resend > 0}
-                        onClick={() => { handleSendOtp(); setOtp(""); setReceivedOtp(""); }}
+                        onClick={() => { recaptchaRef.current?.clear(); recaptchaRef.current = null; handleSendOtp(); setOtp(""); }}
                         className="text-xs font-semibold text-red-500 hover:text-red-700 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
                       >
                         {resend > 0 ? `Resend in ${resend}s` : "Resend OTP →"}

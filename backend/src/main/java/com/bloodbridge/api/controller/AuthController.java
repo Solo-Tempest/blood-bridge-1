@@ -39,6 +39,12 @@ public class AuthController {
         return ResponseEntity.ok(otpService.verifyOtp(request.getPhone(), request.getOtp()));
     }
 
+    // Called after Firebase Phone Auth confirms OTP client-side
+    @PostMapping("/donor/phone/verified")
+    public ResponseEntity<AuthResponse> donorPhoneVerified(@Valid @RequestBody OtpSendRequest request) {
+        return ResponseEntity.ok(otpService.loginByVerifiedPhone(request.getPhone()));
+    }
+
     /* ── Hospital ── */
 
     @PostMapping("/hospital/register")
@@ -59,5 +65,11 @@ public class AuthController {
     @PostMapping("/hospital/otp/verify")
     public ResponseEntity<AuthResponse> hospitalVerifyOtp(@Valid @RequestBody OtpVerifyRequest request) {
         return ResponseEntity.ok(otpService.verifyOtp(request.getPhone(), request.getOtp()));
+    }
+
+    // Called after Firebase Phone Auth confirms OTP client-side
+    @PostMapping("/hospital/phone/verified")
+    public ResponseEntity<AuthResponse> hospitalPhoneVerified(@Valid @RequestBody OtpSendRequest request) {
+        return ResponseEntity.ok(otpService.loginByVerifiedPhone(request.getPhone()));
     }
 }
