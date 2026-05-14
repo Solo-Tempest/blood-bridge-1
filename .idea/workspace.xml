@@ -4,21 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="900ede8d-4bf2-4552-badd-6108bc406569" name="Changes" comment="openstreet api is linked now while registeration user location can be stored">
-      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/pom.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/controller/AuthController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/controller/AuthController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/OtpService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/OtpService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/resources/application.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/api/auth.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/api/auth.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/DonorLogin.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/DonorLogin.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/DonorRegistration.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/DonorRegistration.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/HospitalLogin.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/HospitalLogin.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/HospitalRegistration.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/HospitalRegistration.jsx" afterDir="false" />
-    </list>
+    <list default="true" id="900ede8d-4bf2-4552-badd-6108bc406569" name="Changes" comment="before implementing email otp feature" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -181,7 +167,31 @@
       <option name="project" value="LOCAL" />
       <updated>1777964250799</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="before implementing email otp feature">
+      <option name="closed" value="true" />
+      <created>1778749627722</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1778749627722</updated>
+    </task>
+    <task id="LOCAL-00012" summary="before implementing email otp feature">
+      <option name="closed" value="true" />
+      <created>1778749692913</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1778749692913</updated>
+    </task>
+    <task id="LOCAL-00013" summary="before implementing email otp feature">
+      <option name="closed" value="true" />
+      <created>1778749776707</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1778749776707</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
@@ -195,6 +205,7 @@
     <MESSAGE value="hospital authentication and its dashboard is open after succesfull login 1" />
     <MESSAGE value="Footer, Navbar,&#10;  DonorRegistration, PrivacyPolicy,&#10;  TermsAndConditions" />
     <MESSAGE value="openstreet api is linked now while registeration user location can be stored" />
-    <option name="LAST_COMMIT_MESSAGE" value="openstreet api is linked now while registeration user location can be stored" />
+    <MESSAGE value="before implementing email otp feature" />
+    <option name="LAST_COMMIT_MESSAGE" value="before implementing email otp feature" />
   </component>
 </project>
