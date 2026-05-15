@@ -173,6 +173,26 @@ export async function verifyHospitalOtp(email, otp) {
   return res.json();
 }
 
+export async function sendHospitalPreRegisterOtp(email) {
+  const res = await fetch(`${BASE_URL}/hospital/otp/pre-register/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function verifyHospitalPreRegisterOtp(email, otp) {
+  const res = await fetch(`${BASE_URL}/hospital/otp/pre-register/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, otp }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
 export async function hospitalRegister(fd) {
   const phone = fd.contact.phone.replace(/\D/g, "").slice(-10);
   const body = {

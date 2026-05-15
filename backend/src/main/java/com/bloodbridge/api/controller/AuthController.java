@@ -60,4 +60,15 @@ public class AuthController {
     public ResponseEntity<AuthResponse> hospitalVerifyOtp(@Valid @RequestBody OtpVerifyRequest request) {
         return ResponseEntity.ok(otpService.verifyOtp(request.getEmail(), request.getOtp()));
     }
+
+    @PostMapping("/hospital/otp/pre-register/send")
+    public ResponseEntity<OtpSendResponse> hospitalPreRegisterSendOtp(@Valid @RequestBody OtpSendRequest request) {
+        return ResponseEntity.ok(otpService.sendPreRegisterOtp(request.getEmail()));
+    }
+
+    @PostMapping("/hospital/otp/pre-register/verify")
+    public ResponseEntity<OtpSendResponse> hospitalPreRegisterVerifyOtp(@Valid @RequestBody OtpVerifyRequest request) {
+        otpService.verifyPreRegisterOtp(request.getEmail(), request.getOtp());
+        return ResponseEntity.ok(OtpSendResponse.builder().message("Email verified successfully").build());
+    }
 }

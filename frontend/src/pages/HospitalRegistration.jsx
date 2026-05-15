@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { hospitalRegister, sendHospitalOtp, verifyHospitalOtp } from "../api/auth";
+import { hospitalRegister, sendHospitalPreRegisterOtp, verifyHospitalPreRegisterOtp } from "../api/auth";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 delete L.Icon.Default.prototype._getIconUrl;
@@ -372,7 +372,47 @@ function Step2({ d, set, errors }) {
 
 /* ── Step 3: Contact ── */
 function Step3({ d, set, errors }) {
-  const [emailSent, setEmailSent] = useState(false);
+  const [otpSent,   setOtpSent]   = useState(false);
+  const [otp,       setOtp]       = useState("");
+  const [otpError,  setOtpError]  = useState("");
+  const [sending,   setSending]   = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [resend,    setResend]    = useState(0);
+
+  useEffect(() => {
+    if (!resend) return;
+    const t = setTimeout(() => setResend(r => r - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resend]);
+
+  const handleSendOtp = async () => {
+    setSending(true); setOtpError("");
+    try {
+      await sendHospitalPreRegisterOtp(d.email);
+      setOtpSent(true); setResend(60);
+    } catch (err) {
+      setOtpError(err.message || "Failed to send OTP. Please try again.");
+    } finally { setSending(false); }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (otp.length !== 6) { setOtpError("Enter the 6-digit OTP"); return; }
+    setVerifying(true); setOtpError("");
+    try {
+      await verifyHospitalPreRegisterOtp(d.email, otp);
+      set({ ...d, emailVerified: true });
+      setOtpSent(false); setOtp("");
+    } catch (err) {
+      setOtpError(err.message || "Verification failed.");
+    } finally { setVerifying(false); }
+  };
+
+  const handleChangeEmail = () => {
+    set({ ...d, emailVerified: false });
+    setOtpSent(false); setOtp(""); setOtpError("");
+  };
+
+  const emailValid = /\S+@\S+\.\S+/.test(d.email);
 
   return (
     <div className="space-y-5 fade-up">
@@ -390,7 +430,7 @@ function Step3({ d, set, errors }) {
         </Field>
       </div>
 
-      <Field label="Primary Phone Number" error={errors.phone} hint="You'll verify this phone via OTP after registration">
+      <Field label="Primary Phone Number" error={errors.phone}>
         <Li>📱</Li>
         <input className={inp(errors.phone)} placeholder="10-digit mobile number" maxLength={10}
           value={d.phone} onChange={e => set({ ...d, phone: e.target.value.replace(/\D/g,"") })}
@@ -403,30 +443,62 @@ function Step3({ d, set, errors }) {
           value={d.altPhone} onChange={e => set({ ...d, altPhone: e.target.value.replace(/\D/g,"") })} inputMode="numeric" />
       </Field>
 
-      <Field label="Email Address" error={errors.email}>
-        <div className="relative group">
-          <Li>✉️</Li>
-          <input className={inpR(errors.email)} type="email" placeholder="hospital@example.com"
-            value={d.email} onChange={e => set({ ...d, email: e.target.value, emailVerified: false })} />
-          <button type="button"
-            onClick={() => { if(/\S+@\S+\.\S+/.test(d.email)){ setEmailSent(true); setTimeout(()=>set(prev=>({...prev,emailVerified:true})),1500); }}}
-            disabled={!/\S+@\S+\.\S+/.test(d.email) || d.emailVerified}
-            className={`absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all duration-200
-              ${d.emailVerified ? "bg-green-100 text-green-600" : "bg-red-600 text-white hover:bg-red-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"}`}>
-            {d.emailVerified ? "✓ Verified" : emailSent ? "Verifying…" : "Verify"}
-          </button>
-        </div>
-      </Field>
-      {emailSent && !d.emailVerified && (
-        <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5 fade-up">
-          📨 Verification link sent to your email. Auto-verifying for demo…
-        </p>
-      )}
-      {d.emailVerified && (
-        <p className="text-xs text-green-600 bg-green-50 border border-green-100 rounded-xl px-4 py-2.5 fade-up">
-          ✅ Email verified successfully!
-        </p>
-      )}
+      {/* ── Email with inline OTP verification ── */}
+      <div className="space-y-3">
+        <Field label="Email Address" error={errors.email}>
+          <div className="relative group">
+            <Li>✉️</Li>
+            <input
+              className={`${inpR(errors.email)} ${d.emailVerified ? "bg-green-50 border-green-300" : ""}`}
+              type="email" placeholder="hospital@example.com"
+              value={d.email}
+              disabled={d.emailVerified}
+              onChange={e => { set({ ...d, email: e.target.value, emailVerified: false }); setOtpSent(false); setOtp(""); setOtpError(""); }}
+            />
+            {d.emailVerified ? (
+              <button type="button" onClick={handleChangeEmail}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-all duration-200">
+                ✓ Verified · Change
+              </button>
+            ) : (
+              <button type="button" onClick={handleSendOtp}
+                disabled={!emailValid || sending || otpSent}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all duration-200 bg-red-600 text-white hover:bg-red-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed">
+                {sending ? "Sending…" : otpSent ? "OTP Sent" : "Send OTP"}
+              </button>
+            )}
+          </div>
+        </Field>
+
+        {otpSent && !d.emailVerified && (
+          <div className="space-y-3 fade-up">
+            <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-center">
+              <p className="text-[11px] text-green-700 font-bold uppercase tracking-widest mb-1">OTP Sent to Your Email</p>
+              <p className="text-sm text-green-800 font-medium">Check your inbox for the 6-digit code</p>
+              <p className="text-[10px] text-green-600 mt-1">Valid for 5 minutes · Do not share it</p>
+            </div>
+
+            <OtpBoxes value={otp} onChange={v => { setOtp(v); setOtpError(""); }} error={otpError} />
+
+            <div className="flex items-center justify-between">
+              <button type="button" disabled={resend > 0} onClick={handleSendOtp}
+                className="text-xs font-semibold text-red-500 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors">
+                {resend > 0 ? `Resend in ${resend}s` : "Resend OTP →"}
+              </button>
+            </div>
+
+            <RedBtn onClick={handleVerifyOtp} disabled={otp.length !== 6 || verifying} className="w-full">
+              {verifying ? <><Spinner /> Verifying…</> : "Verify Email"}
+            </RedBtn>
+          </div>
+        )}
+
+        {d.emailVerified && (
+          <p className="text-xs text-green-600 bg-green-50 border border-green-100 rounded-xl px-4 py-2.5 fade-up">
+            ✅ Email verified successfully!
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -446,7 +518,7 @@ function OtpBoxes({ value, onChange, error }) {
           </div>
         ))}
         <input ref={ref} value={value} onChange={e=>/^\d{0,6}$/.test(e.target.value)&&onChange(e.target.value)}
-          maxLength={6} className="absolute opacity-0 w-0 h-0" />
+          maxLength={6} autoFocus className="absolute opacity-0 w-0 h-0" />
       </div>
       <Err msg={error} />
     </div>
@@ -684,7 +756,7 @@ function Step7({ allData }) {
     ["Pincode",     location.pincode, "🔢"],
     ["Contact",     contact.contactName, "👤"],
     ["Phone",       contact.phone, "📱"],
-    ["Email",       contact.email  + (contact.emailVerified?" ✅":""), "✉️"],
+    ["Email",       contact.email, "✉️"],
     ["Blood Bank",  facilities.hasBloodBank?"Yes":"No", "🩸"],
     ["Hours",       facilities.is24x7 ? "24×7" : `${facilities.openTime||"—"} – ${facilities.closeTime||"—"}`, "🕐"],
   ];
@@ -749,6 +821,7 @@ function validate(step, fd) {
     if(!contact.phone||contact.phone.length!==10) e.phone="Enter a valid 10-digit phone number";
     if(!contact.email?.trim())       e.email="Email address is required";
     else if(!/\S+@\S+\.\S+/.test(contact.email)) e.email="Enter a valid email address";
+    else if(!contact.emailVerified)  e.email="Please verify your email address before proceeding";
   }
   if(step===4){
     if(!facilities.is24x7){
@@ -783,13 +856,6 @@ export default function HospitalRegistration() {
   const [success, setSuccess] = useState(false);
   const [apiError, setApiError] = useState("");
 
-  // OTP verification step (shown after submit)
-  const [otpStep,    setOtpStep]    = useState(false);
-  const [otpValue,   setOtpValue]   = useState("");
-  const [otpError,   setOtpError]   = useState("");
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [resendTimer, setResendTimer] = useState(0);
-
   const [basic,      setBasic]      = useState({ name:"", regNo:"", type:"", year:"", website:"" });
   const [location,   setLocation]   = useState({ street:"", area:"", city:"", state:"", pincode:"", landmark:"", lat:"", lng:"" });
   const [contact,    setContact]    = useState({ contactName:"", role:"", phone:"", altPhone:"", email:"", emailVerified:false });
@@ -799,12 +865,6 @@ export default function HospitalRegistration() {
 
   const fd = { basic, location, contact, facilities, account, docs };
 
-  useEffect(() => {
-    if (!resendTimer) return;
-    const t = setTimeout(() => setResendTimer(r => r - 1), 1000);
-    return () => clearTimeout(t);
-  }, [resendTimer]);
-
   const next = () => {
     if(step===7){ submit(); return; }
     const e = validate(step, fd);
@@ -813,56 +873,18 @@ export default function HospitalRegistration() {
   };
   const back = () => { setErrors({}); setStep(s => s-1); };
 
-  // Register hospital, then send OTP to email
   const submit = async () => {
     setLoading(true);
     setApiError("");
     try {
-      await hospitalRegister({ basic, location, contact, facilities, account, docs });
-    } catch (err) {
-      const msg = err.message.toLowerCase();
-      if (!msg.includes("already") && !msg.includes("exist") && !msg.includes("registered")) {
-        setApiError(err.message);
-        setLoading(false);
-        return;
-      }
-    }
-    try {
-      await sendHospitalOtp(contact.email);
-      setResendTimer(60);
-      setOtpStep(true);
-    } catch (err) {
-      setApiError(err.message || "Failed to send OTP. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    setOtpError("");
-    setOtpValue("");
-    setResendTimer(60);
-    try {
-      await sendHospitalOtp(contact.email);
-    } catch (err) {
-      setOtpError(err.message || "Failed to resend OTP.");
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (otpValue.length !== 6) { setOtpError("Enter the 6-digit OTP"); return; }
-    setOtpLoading(true);
-    setOtpError("");
-    try {
-      const data = await verifyHospitalOtp(contact.email, otpValue);
+      const data = await hospitalRegister({ basic, location, contact, facilities, account, docs });
       localStorage.setItem("bb_token", data.token);
       localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
-      setOtpStep(false);
       setSuccess(true);
     } catch (err) {
-      setOtpError(err.message || "Verification failed.");
+      setApiError(err.message);
     } finally {
-      setOtpLoading(false);
+      setLoading(false);
     }
   };
 
@@ -872,57 +894,6 @@ export default function HospitalRegistration() {
     const t = setTimeout(() => navigate("/hospital-dashboard"), 2600);
     return () => clearTimeout(t);
   }, [success]);
-
-  /* ── OTP verification screen (shown after submit, before success) ── */
-  if (otpStep) return (
-    <>
-      <GlobalStyles />
-      <div className="min-h-screen flex items-center justify-center px-4 pt-[80px] pb-12" style={BG}>
-        <div className="w-full max-w-md">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2.5">
-              <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-rose-500 rounded-xl flex items-center justify-center text-xl shadow-lg shadow-red-200">🩸</div>
-              <span className="text-2xl font-extrabold text-red-600" style={{ fontFamily:"'Playfair Display', serif" }}>Blood Bridge</span>
-            </div>
-          </div>
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl shadow-red-100/60 border border-white/70 p-8 space-y-5">
-            <div className="text-center">
-              <div className="text-5xl mb-3">📧</div>
-              <h2 className="text-2xl font-bold text-gray-800" style={{ fontFamily:"'Playfair Display', serif" }}>Verify Your Email</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                OTP sent to <span className="font-semibold text-red-600">{contact.email}</span>
-              </p>
-            </div>
-
-            {(
-              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-center">
-                <p className="text-[11px] text-green-700 font-bold uppercase tracking-widest mb-1">OTP Sent to Your Email</p>
-                <p className="text-sm text-green-800 font-medium">Check your inbox for the 6-digit code</p>
-                <p className="text-[10px] text-green-600 mt-1">Valid for 5 minutes · Do not share it</p>
-              </div>
-            )}
-
-            <OtpBoxes
-              value={otpValue}
-              onChange={v => { setOtpValue(v); setOtpError(""); }}
-              error={otpError}
-            />
-
-            <RedBtn onClick={handleVerifyOtp} disabled={otpValue.length !== 6 || otpLoading} className="w-full">
-              {otpLoading ? <><Spinner /> Verifying…</> : "✅ Verify & Complete Registration"}
-            </RedBtn>
-
-            <div className="text-center">
-              <button type="button" disabled={resendTimer > 0} onClick={handleResendOtp}
-                className="text-xs font-semibold text-red-500 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors">
-                {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend OTP →"}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  );
 
   if(success) return (
     <>

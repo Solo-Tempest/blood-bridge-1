@@ -129,6 +129,7 @@ function OtpInput({ value, onChange, error }) {
           value={value}
           onChange={e => isOtpNum(e.target.value) && onChange(e.target.value)}
           maxLength={6}
+          autoFocus
           className="absolute inset-0 opacity-0 cursor-text"
         />
       </div>

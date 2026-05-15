@@ -127,7 +127,7 @@ function OtpBoxes({ value, onChange, error }) {
         ))}
         <input ref={ref} value={value}
           onChange={e => isOtpNum(e.target.value) && onChange(e.target.value)}
-          maxLength={6} className="absolute opacity-0 w-0 h-0" />
+          maxLength={6} autoFocus className="absolute opacity-0 w-0 h-0" />
       </div>
       {error && <p className="flex items-center gap-1.5 text-[11px] text-red-500 font-medium justify-center"><span className="w-1.5 h-1.5 rounded-full bg-red-400" />{error}</p>}
     </div>
