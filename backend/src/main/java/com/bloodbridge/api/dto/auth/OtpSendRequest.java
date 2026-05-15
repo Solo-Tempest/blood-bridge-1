@@ -1,13 +1,13 @@
 package com.bloodbridge.api.dto.auth;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
 @Data
 public class OtpSendRequest {
 
-    @NotBlank(message = "Phone number is required")
-    @Pattern(regexp = "^[6-9]\\d{9}$", message = "Invalid Indian phone number")
-    private String phone;
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email address")
+    private String email;
 }

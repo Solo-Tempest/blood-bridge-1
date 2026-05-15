@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { signInWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
-import { auth } from "../firebase";
-import { hospitalLogin, hospitalPhoneVerifiedLogin } from "../api/auth";
+import { hospitalLogin, sendHospitalOtp, verifyHospitalOtp } from "../api/auth";
 
 /* ─── Global Styles ───────────────────────────────────────────────────── */
 const GlobalStyles = () => (
@@ -172,13 +170,11 @@ export default function HospitalLogin() {
   const [cardIn,     setCardIn]     = useState(false);
 
   // OTP mode
-  const [phone,              setPhone]              = useState("");
-  const [otpSent,            setOtpSent]            = useState(false);
-  const [otp,                setOtp]                = useState("");
-  const [confirmationResult, setConfirmationResult] = useState(null);
-  const recaptchaRef                               = useRef(null);
-  const [resend,             setResend]             = useState(0);
-  const [otpError,           setOtpError]           = useState("");
+  const [otpEmail, setOtpEmail] = useState("");
+  const [otpSent,  setOtpSent]  = useState(false);
+  const [otp,      setOtp]      = useState("");
+  const [resend,   setResend]   = useState(0);
+  const [otpError, setOtpError] = useState("");
 
   useEffect(() => { requestAnimationFrame(() => setCardIn(true)); }, []);
 
@@ -189,39 +185,15 @@ export default function HospitalLogin() {
     return () => clearTimeout(t);
   }, [resend]);
 
-  // Initialize reCAPTCHA once the OTP tab is active
-  useEffect(() => {
-    if (mode !== "otp" || otpSent) return;
-    recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-hospital", { size: "invisible" });
-    return () => {
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
-    };
-  }, [mode, otpSent]);
-
-  async function startResend() {
-    setOtp(""); setOtpError(""); setResend(30);
-    try {
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-hospital", { size: "invisible" });
-      const result = await signInWithPhoneNumber(auth, "+91" + phone, recaptchaRef.current);
-      setConfirmationResult(result);
-    } catch (err) {
-      setOtpError(err.message || "Failed to resend OTP.");
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
-    }
-  }
-
   /* identifier icon */
-  const idIcon = isPhone(identifier) ? <IcoPhone /> : <IcoMail />;
+  const idIcon = isEmail(identifier) ? <IcoMail /> : <IcoPhone />;
 
   /* validation */
   function validate() {
     const e = {};
     if (!identifier.trim()) {
       e.identifier = "Email or phone number is required";
-    } else if (!isEmail(identifier) && !isPhone(identifier)) {
+    } else if (!isEmail(identifier) && !/^\d{10}$/.test(identifier.trim())) {
       e.identifier = "Enter a valid email address or 10-digit phone number";
     }
     if (mode === "password") {
@@ -232,31 +204,35 @@ export default function HospitalLogin() {
     return !Object.keys(e).length;
   }
 
-  function validateOtpPhone() {
-    if (!phone) { setErrors({ phone: "Phone number is required" }); return false; }
-    if (!isPhone(phone)) { setErrors({ phone: "Enter a valid 10-digit phone number" }); return false; }
+  function validateOtpEmail() {
+    if (!otpEmail.trim()) { setErrors({ otpEmail: "Email is required" }); return false; }
+    if (!isEmail(otpEmail)) { setErrors({ otpEmail: "Enter a valid email address" }); return false; }
     setErrors({});
     return true;
   }
 
   /* handlers */
   async function handleSendOtp() {
-    if (!validateOtpPhone()) return;
+    if (!validateOtpEmail()) return;
     setLoading(true);
     setApiError("");
     try {
-      const verifier = recaptchaRef.current ?? new RecaptchaVerifier(auth, "recaptcha-hospital", { size: "invisible" });
-      recaptchaRef.current = verifier;
-      const result = await signInWithPhoneNumber(auth, "+91" + phone, verifier);
-      setConfirmationResult(result);
+      await sendHospitalOtp(otpEmail);
       setOtpSent(true);
-      setResend(30);
+      setResend(60);
     } catch (err) {
       setApiError(err.message || "Failed to send OTP. Please try again.");
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function startResend() {
+    setOtp(""); setOtpError(""); setResend(60);
+    try {
+      await sendHospitalOtp(otpEmail);
+    } catch (err) {
+      setOtpError(err.message || "Failed to resend OTP.");
     }
   }
 
@@ -266,17 +242,12 @@ export default function HospitalLogin() {
       setLoading(true);
       setApiError("");
       try {
-        await confirmationResult.confirm(otp);
-        const data = await hospitalPhoneVerifiedLogin(phone);
+        const data = await verifyHospitalOtp(otpEmail, otp);
         localStorage.setItem("bb_token", data.token);
         localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
         setSuccess(true);
       } catch (err) {
-        if (err.code === "auth/invalid-verification-code") {
-          setOtpError("Invalid OTP. Please check and try again.");
-        } else {
-          setOtpError(err.message || "Verification failed. Please try again.");
-        }
+        setOtpError(err.message || "Verification failed. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -297,8 +268,8 @@ export default function HospitalLogin() {
     }
   }
 
-  const canSubmitPassword = (isEmail(identifier) || isPhone(identifier)) && password.length >= 6;
-  const canSubmitOtp      = otpSent ? otp.length === 6 : isPhone(phone);
+  const canSubmitPassword = (isEmail(identifier) || /^\d{10}$/.test(identifier.trim())) && password.length >= 6;
+  const canSubmitOtp      = otpSent ? otp.length === 6 : isEmail(otpEmail);
 
   useEffect(() => {
     if (!success) return;
@@ -344,7 +315,6 @@ export default function HospitalLogin() {
   return (
     <>
       <GlobalStyles />
-      <div id="recaptcha-hospital" />
       <div className="min-h-screen flex items-center justify-center px-4 pt-[80px] pb-12" style={BG}>
 
         <div className="w-full max-w-md transition-all duration-700"
@@ -383,7 +353,7 @@ export default function HospitalLogin() {
               <div className="flex bg-slate-50 border border-slate-100 rounded-xl p-1 gap-1 mb-6">
                 {[{ key: "password", label: "Password Login" }, { key: "otp", label: "OTP Login" }].map(opt => (
                   <button key={opt.key} type="button"
-                    onClick={() => { setMode(opt.key); setErrors({}); setOtpSent(false); setOtp(""); setPhone(""); setOtpError(""); }}
+                    onClick={() => { setMode(opt.key); setErrors({}); setOtpSent(false); setOtp(""); setOtpEmail(""); setOtpError(""); }}
                     className={`flex-1 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all duration-250
                       ${mode === opt.key
                         ? "bg-white text-red-600 shadow-md shadow-red-50 border border-red-100"
@@ -455,21 +425,21 @@ export default function HospitalLogin() {
                 {/* ── OTP mode ── */}
                 {mode === "otp" && !otpSent && (
                   <>
-                    <Field label="Registered Phone Number" error={errors.phone}>
-                      <LeadIcon><IcoPhone /></LeadIcon>
-                      <input className={inputCls(errors.phone)}
-                        placeholder="10-digit registered mobile"
-                        value={phone} maxLength={10} inputMode="numeric"
-                        onChange={e => { setPhone(e.target.value.replace(/\D/g, "")); setErrors({}); }} />
+                    <Field label="Registered Email Address" error={errors.otpEmail}>
+                      <LeadIcon><IcoMail /></LeadIcon>
+                      <input className={inputCls(errors.otpEmail)}
+                        placeholder="admin@hospital.com"
+                        value={otpEmail} type="email"
+                        onChange={e => { setOtpEmail(e.target.value); setErrors({}); }} />
                     </Field>
                     <p className="text-[11px] text-gray-500 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 flex items-start gap-2">
-                      <span className="flex-shrink-0 mt-0.5">📲</span>
-                      A 6-digit OTP will be sent via SMS to your hospital's registered phone number.
+                      <span className="flex-shrink-0 mt-0.5">📧</span>
+                      A 6-digit OTP will be sent to your hospital's registered email address.
                     </p>
-                    <button type="button" onClick={handleSendOtp} disabled={!isPhone(phone) || loading}
+                    <button type="button" onClick={handleSendOtp} disabled={!isEmail(otpEmail) || loading}
                       className={`w-full py-3.5 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2
                         transition-all duration-300 shadow-md active:scale-[.98]
-                        ${isPhone(phone) && !loading
+                        ${isEmail(otpEmail) && !loading
                           ? "shimmer-btn hover:shadow-xl hover:shadow-red-200"
                           : "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"}`}>
                       {loading ? <><Spinner /> Sending OTP…</> : <><span>Send OTP</span><IcoArrow /></>}
@@ -480,18 +450,18 @@ export default function HospitalLogin() {
                 {mode === "otp" && otpSent && (
                   <>
                     <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-                      <span className="text-slate-400"><IcoPhone /></span>
-                      <span className="text-sm font-semibold text-gray-700 flex-1">{phone}</span>
+                      <span className="text-slate-400"><IcoMail /></span>
+                      <span className="text-sm font-semibold text-gray-700 flex-1 truncate">{otpEmail}</span>
                       <button type="button" onClick={() => { setOtpSent(false); setOtp(""); setOtpError(""); }}
                         className="text-xs text-red-500 font-bold hover:text-red-700 transition-colors">
                         Change
                       </button>
                     </div>
 
-                    <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
-                      <p className="text-[11px] text-blue-600 font-bold uppercase tracking-widest mb-1">OTP Sent via Firebase</p>
-                      <p className="text-sm text-blue-700 font-medium">Check your phone for the 6-digit SMS</p>
-                      <p className="text-[10px] text-blue-500 mt-1">Valid for a few minutes · Do not share it</p>
+                    <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-center">
+                      <p className="text-[11px] text-green-700 font-bold uppercase tracking-widest mb-1">OTP Sent to Your Email</p>
+                      <p className="text-sm text-green-800 font-medium">Check your inbox for the 6-digit code</p>
+                      <p className="text-[10px] text-green-600 mt-1">Valid for 5 minutes · Do not share it</p>
                     </div>
 
                     <OtpBoxes value={otp} onChange={v => { setOtp(v); setOtpError(""); }} error={otpError} />

@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { signInWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
-import { auth } from "../firebase";
-import { donorLogin, donorPhoneVerifiedLogin } from "../api/auth";
+import { donorLogin, sendDonorOtp, verifyDonorOtp } from "../api/auth";
 
 const IconPhone = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
@@ -36,7 +34,6 @@ const IconArrow = () => (
 );
 
 const isEmail  = v => /\S+@\S+\.\S+/.test(v);
-const isPhone  = v => /^\d{10}$/.test(v.trim());
 const isOtpNum = v => /^\d{0,6}$/.test(v);
 
 function Drops() {
@@ -161,19 +158,17 @@ export default function DonorLogin() {
   const navigate = useNavigate();
   const [mode, setMode]             = useState("password");
   const [identifier, setIdentifier] = useState("");
-  const [phone, setPhone]           = useState("");
+  const [otpEmail, setOtpEmail]     = useState("");
   const [password, setPassword]     = useState("");
   const [showPw, setShowPw]         = useState(false);
   const [remember, setRemember]     = useState(false);
   const [errors, setErrors]         = useState({});
   const [loading, setLoading]       = useState(false);
   const [apiError, setApiError]     = useState("");
-  const [otpSent, setOtpSent]               = useState(false);
-  const [otp, setOtp]                       = useState("");
-  const [confirmationResult, setConfirmationResult] = useState(null);
-  const recaptchaRef                        = useRef(null);
-  const [resend, setResend]                 = useState(0);
-  const [cardIn, setCardIn]                 = useState(false);
+  const [otpSent, setOtpSent]       = useState(false);
+  const [otp, setOtp]               = useState("");
+  const [resend, setResend]         = useState(0);
+  const [cardIn, setCardIn]         = useState(false);
 
   useEffect(() => { requestAnimationFrame(() => setCardIn(true)); }, []);
 
@@ -183,35 +178,21 @@ export default function DonorLogin() {
     return () => clearTimeout(t);
   }, [resend]);
 
-  // Initialize reCAPTCHA once the OTP tab is active (DOM element is guaranteed to exist)
-  useEffect(() => {
-    if (mode !== "otp" || otpSent) return;
-    recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-donor", { size: "invisible" });
-    return () => {
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
-    };
-  }, [mode, otpSent]);
-
-  const idIcon = identifier && isPhone(identifier)
-    ? <IconPhone />
-    : <IconMail />;
-
   function validate() {
     const e = {};
     if (mode === "password") {
       if (!identifier.trim()) {
         e.identifier = "Email or phone number is required";
-      } else if (!isEmail(identifier) && !isPhone(identifier)) {
+      } else if (!isEmail(identifier) && !/^\d{10}$/.test(identifier.trim())) {
         e.identifier = "Enter a valid email or phone number";
       }
       if (!password) e.password = "Password is required";
       else if (password.length < 6) e.password = "Password must be at least 6 characters";
     } else {
-      if (!phone.trim()) {
-        e.phone = "Phone number is required";
-      } else if (!isPhone(phone)) {
-        e.phone = "Enter a valid 10-digit mobile number";
+      if (!otpEmail.trim()) {
+        e.otpEmail = "Email is required";
+      } else if (!isEmail(otpEmail)) {
+        e.otpEmail = "Enter a valid email address";
       }
     }
     setErrors(e);
@@ -223,16 +204,11 @@ export default function DonorLogin() {
     setLoading(true);
     setApiError("");
     try {
-      const verifier = recaptchaRef.current ?? new RecaptchaVerifier(auth, "recaptcha-donor", { size: "invisible" });
-      recaptchaRef.current = verifier;
-      const result = await signInWithPhoneNumber(auth, "+91" + phone, verifier);
-      setConfirmationResult(result);
+      await sendDonorOtp(otpEmail);
       setOtpSent(true);
-      setResend(30);
+      setResend(60);
     } catch (err) {
       setApiError(err.message || "Failed to send OTP. Please try again.");
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
     } finally {
       setLoading(false);
     }
@@ -244,17 +220,12 @@ export default function DonorLogin() {
       setLoading(true);
       setApiError("");
       try {
-        await confirmationResult.confirm(otp);
-        const data = await donorPhoneVerifiedLogin(phone);
+        const data = await verifyDonorOtp(otpEmail, otp);
         localStorage.setItem("bb_token", data.token);
         localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
         navigate("/donor");
       } catch (err) {
-        if (err.code === "auth/invalid-verification-code") {
-          setApiError("Invalid OTP. Please check and try again.");
-        } else {
-          setApiError(err.message || "Verification failed. Please try again.");
-        }
+        setApiError(err.message || "Verification failed. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -279,12 +250,11 @@ export default function DonorLogin() {
     ? identifier.trim() && password.length >= 6
     : otpSent
     ? otp.length === 6
-    : isPhone(phone);
+    : isEmail(otpEmail);
 
   return (
     <>
       <PageStyles />
-      <div id="recaptcha-donor" />
       <div className="min-h-screen flex items-center justify-center px-4 py-12 pt-[80px]" style={bgStyle}>
         <Drops />
 
@@ -329,7 +299,7 @@ export default function DonorLogin() {
                   <button
                     key={opt.key}
                     type="button"
-                    onClick={() => { setMode(opt.key); setErrors({}); setOtpSent(false); setOtp(""); setPhone(""); }}
+                    onClick={() => { setMode(opt.key); setErrors({}); setOtpSent(false); setOtp(""); setOtpEmail(""); }}
                     className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all duration-250
                       ${mode === opt.key
                         ? "bg-white text-red-600 shadow-md shadow-red-100"
@@ -343,7 +313,7 @@ export default function DonorLogin() {
               <div className="space-y-5">
                 {mode === "password" && (
                   <Field label="Email or Phone" error={errors.identifier}>
-                    <LeadIcon>{idIcon}</LeadIcon>
+                    <LeadIcon><IconMail /></LeadIcon>
                     <input
                       className={inputCls(errors.identifier)}
                       placeholder="you@example.com or 98765…"
@@ -356,20 +326,19 @@ export default function DonorLogin() {
 
                 {mode === "otp" && !otpSent && (
                   <>
-                    <Field label="Phone Number" error={errors.phone}>
-                      <LeadIcon><IconPhone /></LeadIcon>
+                    <Field label="Registered Email" error={errors.otpEmail}>
+                      <LeadIcon><IconMail /></LeadIcon>
                       <input
-                        className={inputCls(errors.phone)}
-                        placeholder="10-digit mobile number"
-                        value={phone}
-                        maxLength={10}
-                        onChange={e => { const v = e.target.value.replace(/\D/g, ""); setPhone(v); setErrors(err => ({ ...err, phone: "" })); }}
-                        autoComplete="tel"
-                        inputMode="numeric"
+                        className={inputCls(errors.otpEmail)}
+                        placeholder="you@example.com"
+                        value={otpEmail}
+                        onChange={e => { setOtpEmail(e.target.value); setErrors(err => ({ ...err, otpEmail: "" })); }}
+                        autoComplete="email"
+                        type="email"
                       />
                     </Field>
                     <p className="text-xs text-gray-500 bg-rose-50 border border-rose-100 rounded-xl px-4 py-3">
-                      📲 A 6-digit OTP will be sent via SMS to your registered phone number.
+                      📧 A 6-digit OTP will be sent to your registered email address.
                     </p>
                   </>
                 )}
@@ -377,8 +346,8 @@ export default function DonorLogin() {
                 {mode === "otp" && otpSent && (
                   <>
                     <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 rounded-xl px-4 py-3">
-                      <span className="text-red-400"><IconPhone /></span>
-                      <span className="text-sm font-semibold text-gray-700 flex-1">{phone}</span>
+                      <span className="text-red-400"><IconMail /></span>
+                      <span className="text-sm font-semibold text-gray-700 flex-1 truncate">{otpEmail}</span>
                       <button
                         type="button"
                         onClick={() => { setOtpSent(false); setOtp(""); setErrors({}); }}
@@ -387,17 +356,17 @@ export default function DonorLogin() {
                         Change
                       </button>
                     </div>
-                    <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
-                      <p className="text-[11px] text-blue-600 font-bold uppercase tracking-widest mb-1">OTP Sent via Firebase</p>
-                      <p className="text-sm text-blue-700 font-medium">Check your phone for the 6-digit SMS</p>
-                      <p className="text-[10px] text-blue-500 mt-1">Valid for a few minutes · Do not share it</p>
+                    <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-center">
+                      <p className="text-[11px] text-green-700 font-bold uppercase tracking-widest mb-1">OTP Sent to Your Email</p>
+                      <p className="text-sm text-green-800 font-medium">Check your inbox for the 6-digit code</p>
+                      <p className="text-[10px] text-green-600 mt-1">Valid for 5 minutes · Do not share it</p>
                     </div>
                     <OtpInput value={otp} onChange={setOtp} error={errors.otp} />
                     <div className="text-right">
                       <button
                         type="button"
                         disabled={resend > 0}
-                        onClick={() => { recaptchaRef.current?.clear(); recaptchaRef.current = null; handleSendOtp(); setOtp(""); }}
+                        onClick={() => { handleSendOtp(); setOtp(""); }}
                         className="text-xs font-semibold text-red-500 hover:text-red-700 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
                       >
                         {resend > 0 ? `Resend in ${resend}s` : "Resend OTP →"}
@@ -455,7 +424,7 @@ export default function DonorLogin() {
                   <button
                     type="button"
                     onClick={handleSendOtp}
-                    disabled={!isPhone(phone) || loading}
+                    disabled={!isEmail(otpEmail) || loading}
                     className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-red-600 to-rose-500
                       hover:from-red-700 hover:to-rose-600 disabled:from-gray-300 disabled:to-gray-200 disabled:text-gray-400
                       disabled:cursor-not-allowed transition-all duration-300 shadow-lg shadow-red-200

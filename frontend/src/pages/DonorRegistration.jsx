@@ -1,8 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { signInWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
-import { auth } from "../firebase";
-import { donorRegister, donorPhoneVerifiedLogin } from "../api/auth";
+import { donorRegister, sendDonorOtp, verifyDonorOtp } from "../api/auth";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -617,7 +615,7 @@ function Step3({ data, setData, errors }) {
   );
 }
 
-function Step4({ data, setData, otpSent, loading, apiError, resendTimer, onSendOtp, onResend, onVerifyOtp, verified, phone }) {
+function Step4({ data, setData, otpSent, loading, apiError, resendTimer, onSendOtp, onResend, onVerifyOtp, verified, email }) {
   if (verified) {
     return (
       <div className="flex flex-col items-center justify-center py-8 gap-4 animate-fadeIn">
@@ -625,7 +623,7 @@ function Step4({ data, setData, otpSent, loading, apiError, resendTimer, onSendO
         <h2 className="text-2xl font-bold text-gray-800" style={{ fontFamily: "'Playfair Display', serif" }}>
           Verified!
         </h2>
-        <p className="text-sm text-gray-500 text-center">Phone verified successfully.<br/>Completing your registration…</p>
+        <p className="text-sm text-gray-500 text-center">Email verified successfully.<br/>Completing your registration…</p>
         <div className="mt-4 bg-red-50 border border-red-100 rounded-2xl p-5 w-full text-center">
           <p className="text-xs text-red-400 uppercase tracking-wider font-semibold mb-1">Registration Complete</p>
           <p className="text-sm text-gray-600">Welcome to <span className="font-bold text-red-600">Blood Bridge</span> 🩸</p>
@@ -638,17 +636,17 @@ function Step4({ data, setData, otpSent, loading, apiError, resendTimer, onSendO
     <div className="space-y-5 animate-fadeIn">
       <div>
         <h2 className="text-2xl font-bold text-gray-800" style={{ fontFamily: "'Playfair Display', serif" }}>
-          Verify Your Number
+          Verify Your Email
         </h2>
         <p className="text-sm text-gray-500 mt-1">
-          We'll send a 6-digit OTP to <span className="font-semibold text-red-600">{phone || "+91 XXXXX XXXXX"}</span>
+          We'll send a 6-digit OTP to <span className="font-semibold text-red-600">{email || "your email"}</span>
         </p>
       </div>
 
       {!otpSent ? (
         <div className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-100 rounded-2xl p-6 text-center space-y-4">
-          <div className="text-5xl">📲</div>
-          <p className="text-sm text-gray-600">Click below to receive your OTP via SMS</p>
+          <div className="text-5xl">📧</div>
+          <p className="text-sm text-gray-600">Click below to receive your OTP via Email</p>
           {apiError && (
             <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">⚠ {apiError}</p>
           )}
@@ -660,16 +658,16 @@ function Step4({ data, setData, otpSent, loading, apiError, resendTimer, onSendO
           >
             {loading ? (
               <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="3"/><path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z"/></svg> Registering &amp; Sending OTP…</>
-            ) : "Send OTP"}
+            ) : "Send OTP to Email"}
           </button>
         </div>
       ) : (
         <>
           {(
-            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
-              <p className="text-[11px] text-blue-600 font-bold uppercase tracking-widest mb-1">OTP Sent via Firebase</p>
-              <p className="text-sm text-blue-700 font-medium">Check your phone for the 6-digit SMS</p>
-              <p className="text-[10px] text-blue-500 mt-1">Valid for 5 minutes · Do not share it</p>
+            <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-center">
+              <p className="text-[11px] text-green-700 font-bold uppercase tracking-widest mb-1">OTP Sent to Your Email</p>
+              <p className="text-sm text-green-800 font-medium">Check your inbox for the 6-digit code</p>
+              <p className="text-[10px] text-green-600 mt-1">Valid for 5 minutes · Do not share it</p>
             </div>
           )}
 
@@ -757,8 +755,6 @@ export default function DonorRegistration() {
   const [errors, setErrors] = useState({});
   const [otpSent, setOtpSent] = useState(false);
   const [verified, setVerified] = useState(false);
-  const [confirmationResult, setConfirmationResult] = useState(null);
-  const recaptchaRef = useRef(null);
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpApiError, setOtpApiError] = useState("");
   const [resendTimer, setResendTimer] = useState(0);
@@ -776,15 +772,6 @@ export default function DonorRegistration() {
     return () => clearTimeout(t);
   }, [resendTimer]);
 
-  // Initialize reCAPTCHA once step 4 is shown and OTP not yet sent
-  useEffect(() => {
-    if (step !== 4 || otpSent) return;
-    recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-donor-reg", { size: "invisible" });
-    return () => {
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
-    };
-  }, [step, otpSent]);
 
   const next = () => {
     if (step === 4) return;
@@ -798,14 +785,13 @@ export default function DonorRegistration() {
     setStep(s => s - 1);
   };
 
-  // Step 4: register the account first, then send OTP via Firebase
+  // Step 4: register account first, then send OTP to email
   const handleSendOtp = async () => {
     setOtpLoading(true);
     setOtpApiError("");
     try {
       await donorRegister({ personal, medical, location });
     } catch (err) {
-      // Ignore "already registered" errors — user may be retrying after a failed OTP send
       const msg = err.message.toLowerCase();
       if (!msg.includes("already") && !msg.includes("exist") && !msg.includes("registered")) {
         setOtpApiError(err.message);
@@ -814,17 +800,11 @@ export default function DonorRegistration() {
       }
     }
     try {
-      const phone = cleanPhone(personal.phone);
-      const verifier = recaptchaRef.current ?? new RecaptchaVerifier(auth, "recaptcha-donor-reg", { size: "invisible" });
-      recaptchaRef.current = verifier;
-      const result = await signInWithPhoneNumber(auth, "+91" + phone, verifier);
-      setConfirmationResult(result);
+      await sendDonorOtp(personal.email);
       setOtpSent(true);
-      setResendTimer(30);
+      setResendTimer(60);
     } catch (err) {
       setOtpApiError(err.message || "Failed to send OTP. Please try again.");
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
     } finally {
       setOtpLoading(false);
     }
@@ -833,17 +813,11 @@ export default function DonorRegistration() {
   const handleResendOtp = async () => {
     setOtpApiError("");
     setOtpData({ otp: "", otpError: "" });
-    setResendTimer(30);
+    setResendTimer(60);
     try {
-      const phone = cleanPhone(personal.phone);
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-donor-reg", { size: "invisible" });
-      const result = await signInWithPhoneNumber(auth, "+91" + phone, recaptchaRef.current);
-      setConfirmationResult(result);
+      await sendDonorOtp(personal.email);
     } catch (err) {
       setOtpApiError(err.message || "Failed to resend OTP.");
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
     }
   };
 
@@ -855,18 +829,13 @@ export default function DonorRegistration() {
     setOtpLoading(true);
     setOtpApiError("");
     try {
-      await confirmationResult.confirm(otpData.otp);
-      const phone = cleanPhone(personal.phone);
-      const data = await donorPhoneVerifiedLogin(phone);
+      const data = await verifyDonorOtp(personal.email, otpData.otp);
       localStorage.setItem("bb_token", data.token);
       localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
       setVerified(true);
       setTimeout(() => navigate("/donor"), 1500);
     } catch (err) {
-      const msg = err.code === "auth/invalid-verification-code"
-        ? "Invalid OTP. Please check and try again."
-        : (err.message || "Verification failed.");
-      setOtpData(d => ({ ...d, otpError: msg }));
+      setOtpData(d => ({ ...d, otpError: err.message || "Verification failed." }));
     } finally {
       setOtpLoading(false);
     }
@@ -874,8 +843,6 @@ export default function DonorRegistration() {
 
   return (
     <>
-      {/* Invisible reCAPTCHA anchor — must always be in the DOM */}
-      <div id="recaptcha-donor-reg" />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
         @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
@@ -926,7 +893,7 @@ export default function DonorRegistration() {
                 onResend={handleResendOtp}
                 onVerifyOtp={handleVerifyOtp}
                 verified={verified}
-                phone={personal.phone}
+                email={personal.email}
               />
             )}
 

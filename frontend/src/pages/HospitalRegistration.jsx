@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { signInWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
-import { auth } from "../firebase";
-import { hospitalRegister, hospitalPhoneVerifiedLogin } from "../api/auth";
+import { hospitalRegister, sendHospitalOtp, verifyHospitalOtp } from "../api/auth";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 delete L.Icon.Default.prototype._getIconUrl;
@@ -786,13 +784,11 @@ export default function HospitalRegistration() {
   const [apiError, setApiError] = useState("");
 
   // OTP verification step (shown after submit)
-  const [otpStep,     setOtpStep]     = useState(false);
-  const [otpValue,           setOtpValue]           = useState("");
-  const [otpError,           setOtpError]           = useState("");
-  const [otpLoading,         setOtpLoading]         = useState(false);
-  const [confirmationResult, setConfirmationResult] = useState(null);
-  const recaptchaRef                               = useRef(null);
-  const [resendTimer,        setResendTimer]        = useState(0);
+  const [otpStep,    setOtpStep]    = useState(false);
+  const [otpValue,   setOtpValue]   = useState("");
+  const [otpError,   setOtpError]   = useState("");
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
 
   const [basic,      setBasic]      = useState({ name:"", regNo:"", type:"", year:"", website:"" });
   const [location,   setLocation]   = useState({ street:"", area:"", city:"", state:"", pincode:"", landmark:"", lat:"", lng:"" });
@@ -802,16 +798,6 @@ export default function HospitalRegistration() {
   const [docs,       setDocs]       = useState({ license:null, govApproval:null, bbCert:null });
 
   const fd = { basic, location, contact, facilities, account, docs };
-
-  // Initialize reCAPTCHA once the OTP screen is shown
-  useEffect(() => {
-    if (!otpStep) return;
-    recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-hosp-reg", { size: "invisible" });
-    return () => {
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
-    };
-  }, [otpStep]);
 
   useEffect(() => {
     if (!resendTimer) return;
@@ -827,54 +813,39 @@ export default function HospitalRegistration() {
   };
   const back = () => { setErrors({}); setStep(s => s-1); };
 
-  // Register hospital, then switch to OTP screen (reCAPTCHA initializes via useEffect)
+  // Register hospital, then send OTP to email
   const submit = async () => {
     setLoading(true);
     setApiError("");
     try {
       await hospitalRegister({ basic, location, contact, facilities, account, docs });
-      setResendTimer(30);
-      setOtpStep(true); // triggers the useEffect that initializes RecaptchaVerifier
     } catch (err) {
-      setApiError(err.message);
+      const msg = err.message.toLowerCase();
+      if (!msg.includes("already") && !msg.includes("exist") && !msg.includes("registered")) {
+        setApiError(err.message);
+        setLoading(false);
+        return;
+      }
+    }
+    try {
+      await sendHospitalOtp(contact.email);
+      setResendTimer(60);
+      setOtpStep(true);
+    } catch (err) {
+      setApiError(err.message || "Failed to send OTP. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Sends the Firebase OTP — called after the OTP screen mounts and verifier is ready
-  const sendFirebaseOtp = async () => {
-    try {
-      const verifier = recaptchaRef.current ?? new RecaptchaVerifier(auth, "recaptcha-hosp-reg", { size: "invisible" });
-      recaptchaRef.current = verifier;
-      const result = await signInWithPhoneNumber(auth, "+91" + contact.phone, verifier);
-      setConfirmationResult(result);
-    } catch (err) {
-      setOtpError(err.message || "Failed to send OTP. Please try again.");
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
-    }
-  };
-
-  // Trigger OTP send after the OTP screen (and reCAPTCHA) are ready
-  useEffect(() => {
-    if (!otpStep) return;
-    sendFirebaseOtp();
-  }, [otpStep]);
-
   const handleResendOtp = async () => {
     setOtpError("");
     setOtpValue("");
-    setResendTimer(30);
+    setResendTimer(60);
     try {
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-hosp-reg", { size: "invisible" });
-      const result = await signInWithPhoneNumber(auth, "+91" + contact.phone, recaptchaRef.current);
-      setConfirmationResult(result);
+      await sendHospitalOtp(contact.email);
     } catch (err) {
       setOtpError(err.message || "Failed to resend OTP.");
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
     }
   };
 
@@ -883,18 +854,13 @@ export default function HospitalRegistration() {
     setOtpLoading(true);
     setOtpError("");
     try {
-      await confirmationResult.confirm(otpValue);
-      const data = await hospitalPhoneVerifiedLogin(contact.phone);
+      const data = await verifyHospitalOtp(contact.email, otpValue);
       localStorage.setItem("bb_token", data.token);
       localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
       setOtpStep(false);
       setSuccess(true);
     } catch (err) {
-      setOtpError(
-        err.code === "auth/invalid-verification-code"
-          ? "Invalid OTP. Please check and try again."
-          : (err.message || "Verification failed.")
-      );
+      setOtpError(err.message || "Verification failed.");
     } finally {
       setOtpLoading(false);
     }
@@ -921,19 +887,18 @@ export default function HospitalRegistration() {
           </div>
           <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl shadow-red-100/60 border border-white/70 p-8 space-y-5">
             <div className="text-center">
-              <div className="text-5xl mb-3">📲</div>
-              <h2 className="text-2xl font-bold text-gray-800" style={{ fontFamily:"'Playfair Display', serif" }}>Verify Your Phone</h2>
+              <div className="text-5xl mb-3">📧</div>
+              <h2 className="text-2xl font-bold text-gray-800" style={{ fontFamily:"'Playfair Display', serif" }}>Verify Your Email</h2>
               <p className="text-sm text-gray-500 mt-1">
-                OTP sent to <span className="font-semibold text-red-600">+91 {contact.phone}</span>
+                OTP sent to <span className="font-semibold text-red-600">{contact.email}</span>
               </p>
             </div>
 
-            <div id="recaptcha-hosp-reg" />
             {(
-              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
-                <p className="text-[11px] text-blue-600 font-bold uppercase tracking-widest mb-1">OTP Sent via Firebase</p>
-                <p className="text-sm text-blue-700 font-medium">Check your phone for the 6-digit SMS</p>
-                <p className="text-[10px] text-blue-500 mt-1">Valid for a few minutes · Do not share it</p>
+              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-center">
+                <p className="text-[11px] text-green-700 font-bold uppercase tracking-widest mb-1">OTP Sent to Your Email</p>
+                <p className="text-sm text-green-800 font-medium">Check your inbox for the 6-digit code</p>
+                <p className="text-[10px] text-green-600 mt-1">Valid for 5 minutes · Do not share it</p>
               </div>
             )}
 

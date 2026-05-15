@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "otp_records", indexes = {
-        @Index(name = "idx_otp_phone", columnList = "phone_number"),
+        @Index(name = "idx_otp_email", columnList = "email"),
         @Index(name = "idx_otp_created", columnList = "created_at")
 })
 @Data
@@ -20,8 +20,8 @@ public class OtpRecord {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "phone_number", nullable = false, length = 15)
-    private String phoneNumber;
+    @Column(name = "email", nullable = false, length = 100)
+    private String email;
 
     @Column(name = "otp_code", nullable = false, length = 6)
     private String otpCode;

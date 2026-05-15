@@ -79,11 +79,10 @@
 		</dependency>
 
 
+		<!-- Email (Gmail SMTP) -->
 		<dependency>
-			<groupId>com.twilio.sdk</groupId>
-			<artifactId>twilio</artifactId>
-			<version>10.9.2</version>
-			<scope>compile</scope>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
 
 		<!-- Test -->

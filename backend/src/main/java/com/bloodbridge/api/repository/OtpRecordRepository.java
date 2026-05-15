@@ -11,11 +11,11 @@ import java.util.Optional;
 
 public interface OtpRecordRepository extends JpaRepository<OtpRecord, Long> {
 
-    Optional<OtpRecord> findTopByPhoneNumberAndUsedFalseOrderByCreatedAtDesc(String phoneNumber);
+    Optional<OtpRecord> findTopByEmailAndUsedFalseOrderByCreatedAtDesc(String email);
 
-    long countByPhoneNumberAndCreatedAtAfter(String phoneNumber, LocalDateTime after);
+    long countByEmailAndCreatedAtAfter(String email, LocalDateTime after);
 
     @Modifying
-    @Query("UPDATE OtpRecord o SET o.used = true WHERE o.phoneNumber = :phone AND o.used = false")
-    void invalidateAllByPhoneNumber(@Param("phone") String phone);
+    @Query("UPDATE OtpRecord o SET o.used = true WHERE o.email = :email AND o.used = false")
+    void invalidateAllByEmail(@Param("email") String email);
 }

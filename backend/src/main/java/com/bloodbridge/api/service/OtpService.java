@@ -28,12 +28,12 @@ import java.time.LocalDateTime;
 @Slf4j
 public class OtpService {
 
-    private final UserRepository        userRepository;
-    private final DonorRepository       donorRepository;
-    private final HospitalRepository    hospitalRepository;
-    private final OtpRecordRepository   otpRecordRepository;
-    private final JwtUtil               jwtUtil;
-    private final SmsService            smsService;
+    private final UserRepository       userRepository;
+    private final DonorRepository      donorRepository;
+    private final HospitalRepository   hospitalRepository;
+    private final OtpRecordRepository  otpRecordRepository;
+    private final JwtUtil              jwtUtil;
+    private final SmsService           emailService;
 
     @Value("${otp.expiry-minutes:5}")
     private int expiryMinutes;
@@ -50,28 +50,25 @@ public class OtpService {
     private final SecureRandom random = new SecureRandom();
 
     @Transactional
-    public OtpSendResponse sendOtp(String phone) {
-        userRepository.findByPhone(phone)
-                .orElseThrow(() -> new ApiException("Phone number not registered", HttpStatus.NOT_FOUND));
+    public OtpSendResponse sendOtp(String email) {
+        userRepository.findByEmail(email)
+                .orElseThrow(() -> new ApiException("Email not registered", HttpStatus.NOT_FOUND));
 
-        // Rate limiting — max N sends per phone in rolling window
         LocalDateTime windowStart = LocalDateTime.now().minusMinutes(windowMinutes);
-        long recentCount = otpRecordRepository.countByPhoneNumberAndCreatedAtAfter(phone, windowStart);
+        long recentCount = otpRecordRepository.countByEmailAndCreatedAtAfter(email, windowStart);
         if (recentCount >= maxRequests) {
             throw new ApiException(
                     "Too many OTP requests. Please wait " + windowMinutes + " minutes before trying again.",
                     HttpStatus.TOO_MANY_REQUESTS);
         }
 
-        // Invalidate any existing unused OTPs for this phone
-        otpRecordRepository.invalidateAllByPhoneNumber(phone);
+        otpRecordRepository.invalidateAllByEmail(email);
 
-        // Generate and persist new OTP
         String otp = String.format("%06d", random.nextInt(1_000_000));
         LocalDateTime now = LocalDateTime.now();
 
         otpRecordRepository.save(OtpRecord.builder()
-                .phoneNumber(phone)
+                .email(email)
                 .otpCode(otp)
                 .expiryTime(now.plusMinutes(expiryMinutes))
                 .attempts(0)
@@ -79,43 +76,19 @@ public class OtpService {
                 .createdAt(now)
                 .build());
 
-        // Send via SMS (dev → console, prod → Twilio)
-        smsService.sendOtp(phone, otp);
+        emailService.sendOtp(email, otp);
 
         return OtpSendResponse.builder()
-                .message("OTP sent successfully")
-                // Only include OTP in the response body during dev mode
-                .otp(smsService.isDevMode() ? otp : null)
+                .message("OTP sent to " + email)
                 .build();
     }
 
     @Transactional
-    public AuthResponse loginByVerifiedPhone(String phone) {
-        User user = userRepository.findByPhone(phone)
-                .orElseThrow(() -> new ApiException("Phone number not registered", HttpStatus.NOT_FOUND));
-
-        String token = jwtUtil.generateToken(user);
-
-        String fullName = (user.getRole() == Role.HOSPITAL)
-                ? hospitalRepository.findByUser(user).map(Hospital::getName).orElse(null)
-                : donorRepository.findByUser(user).map(Donor::getFullName).orElse(null);
-
-        return AuthResponse.builder()
-                .token(token)
-                .userId(user.getId())
-                .email(user.getEmail())
-                .role(user.getRole().name())
-                .fullName(fullName)
-                .build();
-    }
-
-    @Transactional
-    public AuthResponse verifyOtp(String phone, String otp) {
+    public AuthResponse verifyOtp(String email, String otp) {
         OtpRecord record = otpRecordRepository
-                .findTopByPhoneNumberAndUsedFalseOrderByCreatedAtDesc(phone)
+                .findTopByEmailAndUsedFalseOrderByCreatedAtDesc(email)
                 .orElseThrow(() -> new ApiException(
-                        "No active OTP found for this number. Please request a new one.",
-                        HttpStatus.BAD_REQUEST));
+                        "No active OTP found. Please request a new one.", HttpStatus.BAD_REQUEST));
 
         if (record.isExpired()) {
             record.setUsed(true);
@@ -136,11 +109,10 @@ public class OtpService {
                     "Invalid OTP. " + remaining + " attempt(s) remaining.", HttpStatus.BAD_REQUEST);
         }
 
-        // Success — expire this OTP immediately
         record.setUsed(true);
         otpRecordRepository.save(record);
 
-        User user = userRepository.findByPhone(phone)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ApiException("User not found", HttpStatus.NOT_FOUND));
 
         String token = jwtUtil.generateToken(user);

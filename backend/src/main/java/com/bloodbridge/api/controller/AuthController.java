@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
-    private final OtpService otpService;
+    private final OtpService  otpService;
 
     /* ── Donor ── */
 
@@ -31,18 +31,12 @@ public class AuthController {
 
     @PostMapping("/donor/otp/send")
     public ResponseEntity<OtpSendResponse> donorSendOtp(@Valid @RequestBody OtpSendRequest request) {
-        return ResponseEntity.ok(otpService.sendOtp(request.getPhone()));
+        return ResponseEntity.ok(otpService.sendOtp(request.getEmail()));
     }
 
     @PostMapping("/donor/otp/verify")
     public ResponseEntity<AuthResponse> donorVerifyOtp(@Valid @RequestBody OtpVerifyRequest request) {
-        return ResponseEntity.ok(otpService.verifyOtp(request.getPhone(), request.getOtp()));
-    }
-
-    // Called after Firebase Phone Auth confirms OTP client-side
-    @PostMapping("/donor/phone/verified")
-    public ResponseEntity<AuthResponse> donorPhoneVerified(@Valid @RequestBody OtpSendRequest request) {
-        return ResponseEntity.ok(otpService.loginByVerifiedPhone(request.getPhone()));
+        return ResponseEntity.ok(otpService.verifyOtp(request.getEmail(), request.getOtp()));
     }
 
     /* ── Hospital ── */
@@ -59,17 +53,11 @@ public class AuthController {
 
     @PostMapping("/hospital/otp/send")
     public ResponseEntity<OtpSendResponse> hospitalSendOtp(@Valid @RequestBody OtpSendRequest request) {
-        return ResponseEntity.ok(otpService.sendOtp(request.getPhone()));
+        return ResponseEntity.ok(otpService.sendOtp(request.getEmail()));
     }
 
     @PostMapping("/hospital/otp/verify")
     public ResponseEntity<AuthResponse> hospitalVerifyOtp(@Valid @RequestBody OtpVerifyRequest request) {
-        return ResponseEntity.ok(otpService.verifyOtp(request.getPhone(), request.getOtp()));
-    }
-
-    // Called after Firebase Phone Auth confirms OTP client-side
-    @PostMapping("/hospital/phone/verified")
-    public ResponseEntity<AuthResponse> hospitalPhoneVerified(@Valid @RequestBody OtpSendRequest request) {
-        return ResponseEntity.ok(otpService.loginByVerifiedPhone(request.getPhone()));
+        return ResponseEntity.ok(otpService.verifyOtp(request.getEmail(), request.getOtp()));
     }
 }

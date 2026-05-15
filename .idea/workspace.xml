@@ -4,7 +4,26 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="900ede8d-4bf2-4552-badd-6108bc406569" name="Changes" comment="before implementing email otp feature" />
+    <list default="true" id="900ede8d-4bf2-4552-badd-6108bc406569" name="Changes" comment="before implementing email otp feature">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/ApiApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/ApiApplication.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/controller/AuthController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/controller/AuthController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/dto/auth/OtpSendRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/dto/auth/OtpSendRequest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/dto/auth/OtpVerifyRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/dto/auth/OtpVerifyRequest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/entity/OtpRecord.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/entity/OtpRecord.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/repository/OtpRecordRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/repository/OtpRecordRepository.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/OtpService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/OtpService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/SmsService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/SmsService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/resources/application.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/api/auth.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/api/auth.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/pages/DonorLogin.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/DonorLogin.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/pages/DonorRegistration.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/DonorRegistration.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/pages/HospitalLogin.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/HospitalLogin.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/pages/HospitalRegistration.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/HospitalRegistration.jsx" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
