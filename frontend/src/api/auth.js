@@ -134,6 +134,23 @@ export async function createBloodRequest(token, data) {
   return res.json();
 }
 
+export async function updateHospitalPassword(token, currentPassword, newPassword) {
+  const res = await fetch(`${API_URL}/hospital/password`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+}
+
+export async function getRequestDonors(token, requestId) {
+  const res = await fetch(`${API_URL}/hospital/blood-requests/${requestId}/donors`, {
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
 export async function cancelBloodRequest(token, id) {
   const res = await fetch(`${API_URL}/hospital/blood-requests/${id}/cancel`, {
     method: "PUT",
@@ -227,6 +244,24 @@ export async function hospitalRegister(fd) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function getDonorNotifications(token) {
+  const res = await fetch(`${API_URL}/donor/notifications`, {
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function respondToNotification(token, id, action) {
+  const res = await fetch(`${API_URL}/donor/notifications/${id}/respond`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+    body: JSON.stringify({ action }),
   });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();

@@ -44,8 +44,7 @@ const STEPS = [
   { id:3, label:"Contact",      icon:"📞" },
   { id:4, label:"Facilities",   icon:"🩸" },
   { id:5, label:"Account",      icon:"🔐" },
-  { id:6, label:"Documents",    icon:"📄" },
-  { id:7, label:"Verify",       icon:"✅" },
+  { id:6, label:"Verify",       icon:"✅" },
 ];
 
 /* ── shared UI atoms ── */
@@ -679,71 +678,6 @@ function Step5({ d, set, errors }) {
   );
 }
 
-/* ── Step 6: Documents ── */
-function Step6({ d, set, errors, hasBloodBank }) {
-  const docs = [
-    { key:"license",  label:"Hospital License Certificate",  icon:"📋", required:true },
-    { key:"govApproval", label:"Government Approval Document", icon:"🏛️", required:true },
-    ...(hasBloodBank ? [{ key:"bbCert", label:"Blood Bank Certification", icon:"🩸", required:true }] : []),
-  ];
-  return (
-    <div className="space-y-5 fade-up">
-      <Hd title="Document Upload" sub="Upload official documents for verification. PDF or image files accepted." />
-      {docs.map(doc => (
-        <DocUpload key={doc.key} label={doc.label} icon={doc.icon} required={doc.required}
-          file={d[doc.key]||null} error={errors[doc.key]}
-          onChange={f => set({ ...d, [doc.key]: f })} />
-      ))}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
-        <p className="font-semibold mb-0.5">📌 Document Guidelines</p>
-        <p>Accepted formats: PDF, JPG, PNG · Max size: 5MB per file · Files must be clearly legible</p>
-      </div>
-    </div>
-  );
-}
-
-function DocUpload({ label, icon, required, file, error, onChange }) {
-  const inputRef = useRef(null);
-  const [dragOver, setDragOver] = useState(false);
-
-  const handleFile = (f) => {
-    if (!f) return;
-    if (f.size > 5*1024*1024) { alert("File too large (max 5MB)"); return; }
-    onChange(f);
-  };
-
-  return (
-    <div>
-      <label className={lbl}>{icon} {label}{required && <span className="text-red-500 ml-0.5">*</span>}</label>
-      {file ? (
-        <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3 fade-in">
-          <span className="text-2xl">{file.type?.includes("pdf") ? "📄" : "🖼️"}</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-700 truncate">{file.name}</p>
-            <p className="text-[11px] text-gray-400">{(file.size/1024).toFixed(1)} KB</p>
-          </div>
-          <button type="button" onClick={() => onChange(null)}
-            className="text-xs text-red-500 font-bold hover:text-red-700 flex-shrink-0">Remove</button>
-        </div>
-      ) : (
-        <div
-          onDragOver={e=>{e.preventDefault();setDragOver(true);}}
-          onDragLeave={()=>setDragOver(false)}
-          onDrop={e=>{e.preventDefault();setDragOver(false);handleFile(e.dataTransfer.files[0]);}}
-          onClick={() => inputRef.current?.click()}
-          className={`border-2 border-dashed rounded-xl px-4 py-5 flex flex-col items-center gap-2 cursor-pointer transition-all duration-200
-            ${dragOver ? "border-red-400 bg-red-50" : error ? "border-red-300 bg-red-50" : "border-rose-200 bg-rose-50/40 hover:border-red-300 hover:bg-red-50"}`}>
-          <span className="text-3xl">{dragOver ? "📂" : "⬆️"}</span>
-          <p className="text-sm font-semibold text-gray-600">Drop file here or <span className="text-red-600">browse</span></p>
-          <p className="text-[11px] text-gray-400">PDF, JPG, PNG · Max 5MB</p>
-          <input ref={inputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
-            onChange={e => handleFile(e.target.files[0])} />
-        </div>
-      )}
-      <Err msg={error} />
-    </div>
-  );
-}
 
 /* ── Step 7: Verification / Review ── */
 function Step7({ allData }) {
@@ -800,7 +734,7 @@ function Hd({ title, sub }) {
 /* ── validation ── */
 function validate(step, fd) {
   const e = {};
-  const { basic, location, contact, facilities, account, docs } = fd;
+  const { basic, location, contact, facilities, account } = fd;
   if(step===1){
     if(!basic.name?.trim())  e.name="Hospital name is required";
     if(!basic.regNo?.trim()) e.regNo="Registration number is required";
@@ -839,11 +773,6 @@ function validate(step, fd) {
     if(!account.confirmPassword)       e.confirmPassword="Please confirm your password";
     else if(account.password!==account.confirmPassword) e.confirmPassword="Passwords do not match";
   }
-  if(step===6){
-    if(!docs.license)    e.license="Hospital license certificate is required";
-    if(!docs.govApproval) e.govApproval="Government approval document is required";
-    if(facilities.hasBloodBank && !docs.bbCert) e.bbCert="Blood bank certification is required";
-  }
   return e;
 }
 
@@ -861,12 +790,10 @@ export default function HospitalRegistration() {
   const [contact,    setContact]    = useState({ contactName:"", role:"", phone:"", altPhone:"", email:"", emailVerified:false });
   const [facilities, setFacilities] = useState({ hasBloodBank:false, bbLicense:"", is24x7:false, openTime:"", closeTime:"", beds:"", icuBeds:"" });
   const [account,    setAccount]    = useState({ password:"", confirmPassword:"" });
-  const [docs,       setDocs]       = useState({ license:null, govApproval:null, bbCert:null });
-
-  const fd = { basic, location, contact, facilities, account, docs };
+  const fd = { basic, location, contact, facilities, account };
 
   const next = () => {
-    if(step===7){ submit(); return; }
+    if(step===6){ submit(); return; }
     const e = validate(step, fd);
     setErrors(e);
     if(!Object.keys(e).length) setStep(s => s+1);
@@ -877,7 +804,7 @@ export default function HospitalRegistration() {
     setLoading(true);
     setApiError("");
     try {
-      const data = await hospitalRegister({ basic, location, contact, facilities, account, docs });
+      const data = await hospitalRegister({ basic, location, contact, facilities, account });
       localStorage.setItem("bb_token", data.token);
       localStorage.setItem("bb_user", JSON.stringify({ userId: data.userId, email: data.email, fullName: data.fullName, role: data.role }));
       setSuccess(true);
@@ -958,12 +885,11 @@ export default function HospitalRegistration() {
                 {step===3 && <Step3 d={contact}    set={setContact}    errors={errors} />}
                 {step===4 && <Step4 d={facilities} set={setFacilities} errors={errors} />}
                 {step===5 && <Step5 d={account}    set={setAccount}    errors={errors} />}
-                {step===6 && <Step6 d={docs}       set={setDocs}       errors={errors} hasBloodBank={facilities.hasBloodBank} />}
-                {step===7 && <Step7 allData={fd} />}
+                {step===6 && <Step7 allData={fd} />}
               </div>
 
               {/* nav */}
-              {apiError && step === 7 && (
+              {apiError && step === 6 && (
                 <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 font-medium mt-4">
                   ⚠ {apiError}
                 </p>
@@ -971,7 +897,7 @@ export default function HospitalRegistration() {
               <div className="flex gap-3 mt-4 pt-5 border-t border-rose-50">
                 {step>1 && <GhostBtn onClick={back}>← Back</GhostBtn>}
                 <div className="flex-1" />
-                {step<7
+                {step<6
                   ? <RedBtn onClick={next}>Next →</RedBtn>
                   : <RedBtn onClick={next} disabled={loading} className="min-w-[180px]">
                       {loading ? <><Spinner /> Submitting…</> : "🎉 Submit Registration"}

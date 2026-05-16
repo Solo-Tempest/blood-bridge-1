@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import { getHospitalProfile, getDocuments, uploadDocument, getBloodRequests, createBloodRequest, cancelBloodRequest } from "../api/auth";
+import { getHospitalProfile, getBloodRequests, createBloodRequest, cancelBloodRequest, updateHospitalPassword, getRequestDonors } from "../api/auth";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 delete L.Icon.Default.prototype._getIconUrl;
@@ -88,10 +88,7 @@ const G = () => (
     .prog-track{background:#e2e8f0;border-radius:999px;height:7px;overflow:hidden}
     .prog-fill{height:100%;border-radius:999px;transition:width .8s cubic-bezier(.22,.68,0,1.1)}
 
-    .doc-card{background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:14px;transition:all .2s}
-    .doc-card:hover{border-color:#93c5fd;background:#f0f7ff}
-
-    .hour-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9;font-size:13px;flex-wrap:wrap;gap:8px}
+.hour-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9;font-size:13px;flex-wrap:wrap;gap:8px}
     .hour-row:last-child{border-bottom:none}
 
     .overlay{position:fixed;inset:0;background:#00000055;z-index:200;display:flex;align-items:center;justify-content:center;animation:fadeIn .2s ease;backdrop-filter:blur(2px)}
@@ -132,11 +129,6 @@ const MOCK_H = {
   street:"",area:"",city:"",state:"",pincode:"",landmark:"",lat:"",lng:"",
   contact:"",role:"",phone:"",altPhone:"",email:"",
   beds:null,icuBeds:null,hasBloodBank:false,is24x7:false,bbLicense:"",
-};
-const DOC_META = {
-  LICENSE:      { label:"Hospital License Certificate", icon:"📋" },
-  GOVT_APPROVAL:{ label:"Government Approval Document",  icon:"🏛️" },
-  BB_CERT:      { label:"Blood Bank Certification",      icon:"🩸" },
 };
 function makeStats(H){
   const age = H.year ? `${new Date().getFullYear() - H.year} yrs active` : "";
@@ -356,7 +348,6 @@ function Sidebar({active,setActive,onLogout,open,onClose}){
     {key:"dashboard",label:"Overview",icon:Ico.dashboard},
     {key:"profile",label:"Hospital Profile",icon:Ico.profile},
     {key:"broadcast",label:"Send Blood Request",icon:Ico.broadcast},
-    {key:"docs",label:"Documents",icon:Ico.docs},
     {key:"facility",label:"Facilities",icon:Ico.facility},
     {key:"contact",label:"Contact Info",icon:Ico.contact},
     {key:"hours",label:"Operating Hours",icon:Ico.clock},
@@ -393,7 +384,7 @@ function Sidebar({active,setActive,onLogout,open,onClose}){
 /* ── TOPBAR ── */
 function TopBar({page,setPage,onMenuClick}){
   const H = useH();
-  const labels={dashboard:"Dashboard",profile:"Hospital Profile",broadcast:"Blood Request",docs:"Documents",facility:"Facilities",contact:"Contact Info",hours:"Operating Hours",settings:"Settings"};
+  const labels={dashboard:"Dashboard",profile:"Hospital Profile",broadcast:"Blood Request",facility:"Facilities",contact:"Contact Info",hours:"Operating Hours",settings:"Settings"};
   return(
     <header className="topbar">
       <button className="hamburger" onClick={onMenuClick}>{Ico.menu}</button>
@@ -421,11 +412,6 @@ function TopBar({page,setPage,onMenuClick}){
 /* ── DASHBOARD ── */
 function DashboardPage({setPage}){
   const H = useH();
-  const [docs,setDocs] = useState([]);
-  useEffect(()=>{
-    const token = localStorage.getItem("bb_token");
-    if(token) getDocuments(token).then(setDocs).catch(()=>{});
-  },[]);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:18}}>
       <div className="fu" style={{background:"linear-gradient(135deg,#1d6fb8,#0284c7,#0ea5e9)",borderRadius:16,padding:"20px 22px",color:"#fff",position:"relative",overflow:"hidden"}}>
@@ -473,23 +459,6 @@ function DashboardPage({setPage}){
               <span style={{fontSize:12,color:"#1a2332",fontWeight:600,textAlign:"right",wordBreak:"break-all"}}>{r.v}</span>
             </div>
           ))}
-        </div>
-        <div className="card fu d4">
-          <SectionHead title="Document Status" icon="📄" onEdit={()=>setPage("docs")} editLabel="View all"/>
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {docs.length===0?(
-              <div style={{textAlign:"center",padding:"12px 0",color:"#94a3b8",fontSize:12.5}}>No documents uploaded yet</div>
-            ):docs.slice(0,3).map(d=>{
-              const meta=DOC_META[d.type]||{label:d.type,icon:"📄"};
-              return(
-                <div key={d.id} className="doc-card">
-                  <span style={{fontSize:18,flexShrink:0}}>{meta.icon}</span>
-                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:600,color:"#1a2332",marginBottom:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{meta.label}</div><div style={{fontSize:10.5,color:"#94a3b8"}}>{new Date(d.uploadedAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div></div>
-                  <StatusBadge status={(d.status||"").toLowerCase()}/>
-                </div>
-              );
-            })}
-          </div>
         </div>
       </div>
     </div>
@@ -551,116 +520,6 @@ function ProfilePage(){
         ) : (
           <MapPreview city={form.city} state={form.state} lat={form.lat} lng={form.lng}/>
         )}
-      </div>
-    </div>
-  );
-}
-
-/* ── DOCUMENTS ── */
-function DocsPage(){
-  const [docs,setDocs]         = useState([]);
-  const [loading,setLoading]   = useState(true);
-  const [uploading,setUploading] = useState(false);
-  const [selType,setSelType]   = useState("LICENSE");
-  const [selFile,setSelFile]   = useState(null);
-  const [error,setError]       = useState("");
-  const [success,setSuccess]   = useState("");
-  const token = localStorage.getItem("bb_token");
-
-  useEffect(()=>{
-    getDocuments(token).then(setDocs).catch(()=>setError("Failed to load documents")).finally(()=>setLoading(false));
-  },[]);
-
-  function fmt(bytes){ if(!bytes) return "—"; if(bytes<1024) return bytes+"B"; if(bytes<1048576) return (bytes/1024).toFixed(1)+"KB"; return (bytes/1048576).toFixed(1)+"MB"; }
-
-  async function handleUpload(){
-    if(!selFile){ setError("Please select a file"); return; }
-    setError(""); setUploading(true);
-    try{
-      const doc = await uploadDocument(token, selType, selFile);
-      setDocs(prev=>[doc,...prev]);
-      setSelFile(null);
-      setSuccess("Document uploaded successfully!");
-      setTimeout(()=>setSuccess(""),3000);
-    }catch(e){ setError(e.message); }
-    finally{ setUploading(false); }
-  }
-
-  const DOC_TYPES = [
-    {key:"LICENSE",label:"Hospital License Certificate"},
-    {key:"GOVT_APPROVAL",label:"Government Approval Document"},
-    {key:"BB_CERT",label:"Blood Bank Certification"},
-  ];
-
-  return(
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
-      {success&&<div className="fu" style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#15803d",fontWeight:600}}>✅ {success}</div>}
-      {error&&<div className="fu" style={{background:"#fef2f2",border:"1.5px solid #fca5a5",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#dc2626",fontWeight:500}}>⚠ {error}</div>}
-
-      <div className="card fu">
-        <SectionHead title="Documents & Verification" icon="📄"/>
-        {loading?(
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:12}}>
-            {[0,1,2].map(i=><div key={i} className="skeleton" style={{height:100,borderRadius:12}}/>)}
-          </div>
-        ):docs.length===0?(
-          <div style={{textAlign:"center",padding:"28px 16px",color:"#94a3b8"}}>
-            <div style={{fontSize:32,marginBottom:8}}>📂</div>
-            <div style={{fontSize:13,fontWeight:600}}>No documents uploaded yet</div>
-          </div>
-        ):(
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:12}}>
-            {docs.map((d,i)=>{
-              const meta = DOC_META[d.type]||{label:d.type,icon:"📄"};
-              const statusLower = (d.status||"").toLowerCase();
-              return(
-                <div key={d.id} className={`fu d${Math.min(i+1,5)}`} style={{background:"#f8fafc",border:"1.5px solid #e2e8f0",borderRadius:13,padding:16}}>
-                  <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:12}}>
-                    <div style={{width:40,height:40,background:statusLower==="verified"?"#dcfce7":statusLower==="rejected"?"#fee2e2":"#fef9c3",borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{meta.icon}</div>
-                    <div style={{minWidth:0}}>
-                      <div style={{fontSize:12.5,fontWeight:700,color:"#1a2332",marginBottom:2,wordBreak:"break-word"}}>{meta.label}</div>
-                      <div style={{fontSize:10.5,color:"#94a3b8"}}>{d.originalName}</div>
-                      <div style={{fontSize:10.5,color:"#94a3b8"}}>{new Date(d.uploadedAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})} · {fmt(d.fileSize)}</div>
-                    </div>
-                  </div>
-                  <StatusBadge status={statusLower}/>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <div className="card fu d2">
-        <SectionHead title="Upload New Document" icon="⬆️"/>
-        <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          <div style={{display:"flex",flexDirection:"column",gap:4}}>
-            <span style={{fontSize:10.5,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".6px"}}>Document Type</span>
-            <select className="inp-plain" value={selType} onChange={e=>setSelType(e.target.value)}>
-              {DOC_TYPES.map(t=><option key={t.key} value={t.key}>{t.label}</option>)}
-            </select>
-          </div>
-          <div style={{display:"flex",flexDirection:"column",gap:4}}>
-            <span style={{fontSize:10.5,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".6px"}}>File</span>
-            {selFile?(
-              <div style={{display:"flex",alignItems:"center",gap:10,background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:10,padding:"10px 14px"}}>
-                <span style={{fontSize:18}}>{selFile.type.includes("pdf")?"📄":"🖼️"}</span>
-                <div style={{flex:1,minWidth:0}}><div style={{fontSize:12.5,fontWeight:600,color:"#1a2332",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selFile.name}</div><div style={{fontSize:11,color:"#94a3b8"}}>{fmt(selFile.size)}</div></div>
-                <button onClick={()=>setSelFile(null)} style={{background:"transparent",border:"none",color:"#dc2626",cursor:"pointer",fontWeight:700,fontSize:12}}>Remove</button>
-              </div>
-            ):(
-              <label style={{border:"2px dashed #bfdbfe",borderRadius:12,padding:"22px 16px",textAlign:"center",background:"#f0f7ff",cursor:"pointer",display:"block"}}>
-                <div style={{fontSize:28,marginBottom:6}}>📂</div>
-                <div style={{fontSize:13,fontWeight:600,color:"#1d6fb8",marginBottom:2}}>Click to browse</div>
-                <div style={{fontSize:11.5,color:"#94a3b8"}}>PDF, JPG, PNG · Max 5MB</div>
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{display:"none"}} onChange={e=>{const f=e.target.files[0];if(f&&f.size>5*1024*1024){setError("File too large (max 5MB)");return;}setSelFile(f||null);setError("");}}/>
-              </label>
-            )}
-          </div>
-          <button className="btn-primary" onClick={handleUpload} disabled={uploading||!selFile} style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center"}}>
-            {uploading?<><span className="spin" style={{width:14,height:14,border:"2px solid #fff5",borderTop:"2px solid #fff",borderRadius:"50%",display:"inline-block"}}/> Uploading…</>:<>⬆️ Upload Document</>}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -782,23 +641,9 @@ function HoursPage(){
   );
 }
 
-/* ── SETTINGS ── */
-function SettingsPage(){
-  const [pw,setPw]=useState({cur:"",next:"",confirm:""});
-  const [showPw,setShowPw]=useState({cur:false,next:false,confirm:false});
-  const [saved,setSaved]=useState(false);
-  const [notif,setNotif]=useState({requests:true,updates:true,email:false});
-  const [pwErr,setPwErr]=useState("");
-  function changePw(){
-    if(!pw.cur){setPwErr("Current password required");return;}
-    if(pw.next.length<6){setPwErr("New password must be at least 6 characters");return;}
-    if(pw.next!==pw.confirm){setPwErr("Passwords do not match");return;}
-    setPwErr("");setSaved(true);setPw({cur:"",next:"",confirm:""});setTimeout(()=>setSaved(false),3000);
-  }
-  const strength=(()=>{let s=0,p=pw.next;if(p.length>=8)s++;if(/[A-Z]/.test(p))s++;if(/[0-9]/.test(p))s++;if(/[^A-Za-z0-9]/.test(p))s++;return s;})();
-  const strColor=["#e2e8f0","#ef4444","#f59e0b","#22c55e","#16a34a"][strength];
-  const strLabel=["","Weak","Fair","Good","Strong"][strength];
-  const PwField=({label,k})=>(
+/* ── SETTINGS helpers (module-level so React never remounts inputs) ── */
+function PwField({label,k,pw,setPw,setPwErr,showPw,setShowPw}){
+  return(
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
       <span style={lbl}>{label}</span>
       <div style={{position:"relative"}}>
@@ -808,7 +653,9 @@ function SettingsPage(){
       </div>
     </div>
   );
-  const Toggle=({label,sub,k})=>(
+}
+function NotifToggle({label,sub,k,notif,setNotif}){
+  return(
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 0",borderBottom:"1px solid #f1f5f9",gap:12}}>
       <div style={{minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:"#1a2332"}}>{label}</div>{sub&&<div style={{fontSize:11.5,color:"#94a3b8",marginTop:1}}>{sub}</div>}</div>
       <div onClick={()=>setNotif(n=>({...n,[k]:!n[k]}))} style={{width:42,height:24,background:notif[k]?"#1d6fb8":"#e2e8f0",borderRadius:999,position:"relative",cursor:"pointer",transition:"background .25s",flexShrink:0}}>
@@ -816,22 +663,236 @@ function SettingsPage(){
       </div>
     </div>
   );
+}
+
+/* ── SETTINGS ── */
+function SettingsPage(){
+  const [pw,setPw]=useState({cur:"",next:"",confirm:""});
+  const [showPw,setShowPw]=useState({cur:false,next:false,confirm:false});
+  const [saved,setSaved]=useState(false);
+  const [loading,setLoading]=useState(false);
+  const [notif,setNotif]=useState({requests:true,updates:true,email:false});
+  const [pwErr,setPwErr]=useState("");
+  async function changePw(){
+    if(!pw.cur){setPwErr("Current password required");return;}
+    if(pw.next.length<6){setPwErr("New password must be at least 6 characters");return;}
+    if(pw.next!==pw.confirm){setPwErr("Passwords do not match");return;}
+    const token=localStorage.getItem("bb_token");
+    setLoading(true);setPwErr("");
+    try{
+      await updateHospitalPassword(token,pw.cur,pw.next);
+      setSaved(true);setPw({cur:"",next:"",confirm:""});setTimeout(()=>setSaved(false),3000);
+    }catch(err){setPwErr(err.message);}
+    finally{setLoading(false);}
+  }
+  const strength=(()=>{let s=0,p=pw.next;if(p.length>=8)s++;if(/[A-Z]/.test(p))s++;if(/[0-9]/.test(p))s++;if(/[^A-Za-z0-9]/.test(p))s++;return s;})();
+  const strColor=["#e2e8f0","#ef4444","#f59e0b","#22c55e","#16a34a"][strength];
+  const strLabel=["","Weak","Fair","Good","Strong"][strength];
+  const fp={pw,setPw,setPwErr,showPw,setShowPw};
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
       {saved&&<div className="fu" style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#15803d",fontWeight:600}}>✅ Password changed!</div>}
       <div className="card fu">
         <SectionHead title="Change Password" icon="🔐"/>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14}}>
-          <PwField label="Current Password" k="cur"/><PwField label="New Password" k="next"/><PwField label="Confirm New Password" k="confirm"/>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          <PwField label="Current Password" k="cur" {...fp}/>
+          <PwField label="New Password" k="next" {...fp}/>
+          <PwField label="Confirm New Password" k="confirm" {...fp}/>
         </div>
         {pw.next.length>0&&<div style={{marginTop:10}}><div style={{display:"flex",gap:4,marginBottom:4}}>{[1,2,3,4].map(i=><div key={i} style={{flex:1,height:4,borderRadius:999,background:i<=strength?strColor:"#e2e8f0",transition:"background .3s"}}/>)}</div><span style={{fontSize:11,fontWeight:600,color:strColor}}>{strLabel} password</span></div>}
         {pwErr&&<p style={{fontSize:12,color:"#ef4444",marginTop:7,fontWeight:500}}>⚠ {pwErr}</p>}
-        <div style={{marginTop:14}}><button className="btn-primary" onClick={changePw}>Update Password</button></div>
+        <div style={{marginTop:14}}><button className="btn-primary" onClick={changePw} disabled={loading}>{loading?"Updating…":"Update Password"}</button></div>
       </div>
       <div className="card fu d1">
         <SectionHead title="Notifications" icon="🔔"/>
-        <Toggle label="Email Notifications" sub="Receive alerts via email" k="email"/>
+        <NotifToggle label="Email Notifications" sub="Receive alerts via email" k="email" notif={notif} setNotif={setNotif}/>
       </div>
+    </div>
+  );
+}
+
+/* ── helpers ── */
+const BLOOD_DISPLAY_H = {
+  A_POSITIVE:"A+",A_NEGATIVE:"A-",B_POSITIVE:"B+",B_NEGATIVE:"B-",
+  AB_POSITIVE:"AB+",AB_NEGATIVE:"AB-",O_POSITIVE:"O+",O_NEGATIVE:"O-",
+};
+function fmtDT(d){
+  if(!d) return "—";
+  const dt=new Date(d);
+  return dt.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})+", "+dt.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true});
+}
+function calcAge(dob){
+  if(!dob) return "—";
+  const today=new Date(), b=new Date(dob);
+  let age=today.getFullYear()-b.getFullYear();
+  if(today.getMonth()-b.getMonth()<0||(today.getMonth()===b.getMonth()&&today.getDate()<b.getDate())) age--;
+  return age+" yrs";
+}
+
+/* ── REQUEST DETAIL VIEW ── */
+function RequestDetailView({ request: r, donors, loading, error, onBack }){
+  const accepted = donors.filter(d=>d.status==="ACCEPTED");
+  const others   = donors.filter(d=>d.status!=="ACCEPTED");
+
+  const statusStyle={
+    ACCEPTED:{ label:"Accepted", bg:"#dcfce7", color:"#15803d", border:"#86efac" },
+    DECLINED:{ label:"Declined", bg:"#fee2e2", color:"#dc2626", border:"#fca5a5" },
+    PENDING: { label:"Pending",  bg:"#fef9c3", color:"#a16207", border:"#fde68a" },
+  };
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:18}} className="fu">
+
+      {/* ── Back + title ── */}
+      <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+        <button onClick={onBack} className="btn-ghost" style={{display:"flex",alignItems:"center",gap:6,fontSize:13,padding:"7px 14px"}}>
+          ← Back to History
+        </button>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".6px"}}>Request Detail</div>
+          <div style={{fontSize:17,fontWeight:700,color:"#1a2332",fontFamily:"'Lora',serif",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            {r.patient}
+            <span style={{fontSize:13,fontWeight:800,background:`linear-gradient(135deg,${urgencyColor[r.urgency]}22,${urgencyBg[r.urgency]})`,color:urgencyColor[r.urgency],padding:"2px 10px",borderRadius:999,border:`1px solid ${urgencyColor[r.urgency]}40`}}>
+              {r.urgency.charAt(0).toUpperCase()+r.urgency.slice(1)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Request summary card ── */}
+      <div className="card" style={{display:"flex",flexWrap:"wrap",gap:14}}>
+        {[
+          {icon:"🩸",label:"Blood Group",  value:r.blood},
+          {icon:"💧",label:"Units",        value:`${r.units} unit${r.units>1?"s":""}`},
+          {icon:"👥",label:"Donors Needed",value:r.donorsNeeded},
+          {icon:"📡",label:"Range",        value:`${r.distance} km`},
+          {icon:"📤",label:"Notified",     value:r.sent},
+          {icon:"✅",label:"Accepted",     value:r.accepted},
+          {icon:"❌",label:"Declined",     value:r.declined},
+          {icon:"⏳",label:"Pending",      value:r.pending},
+        ].map(s=>(
+          <div key={s.label} style={{background:"#f8fafc",borderRadius:10,padding:"9px 14px",minWidth:90,border:"1px solid #e2e8f0"}}>
+            <div style={{fontSize:15,marginBottom:2}}>{s.icon}</div>
+            <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".4px"}}>{s.label}</div>
+            <div style={{fontSize:16,fontWeight:800,color:"#1a2332",fontFamily:"'Lora',serif"}}>{s.value}</div>
+          </div>
+        ))}
+        <div style={{width:"100%",borderTop:"1px solid #f1f5f9",paddingTop:10,display:"flex",flexWrap:"wrap",gap:12,fontSize:12.5,color:"#64748b"}}>
+          <span>📅 {fmtDT(r.date)}</span>
+          {r.notes&&<span>📝 {r.notes}</span>}
+          {r.contactPhone1&&<span>📞 {r.contactPhone1}{r.contactPhone2&&` · ${r.contactPhone2}`}</span>}
+        </div>
+      </div>
+
+      {/* ── Loading / error ── */}
+      {loading&&(
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {[0,1,2].map(i=><div key={i} className="skeleton" style={{height:80,borderRadius:12}}/>)}
+        </div>
+      )}
+      {error&&<div style={{background:"#fef2f2",border:"1.5px solid #fca5a5",borderRadius:10,padding:"12px 16px",fontSize:13,color:"#dc2626"}}>⚠ {error}</div>}
+
+      {!loading&&!error&&donors.length===0&&(
+        <div style={{textAlign:"center",padding:"36px 16px",color:"#94a3b8"}}>
+          <div style={{fontSize:36,marginBottom:8}}>📭</div>
+          <div style={{fontSize:13,fontWeight:600}}>No donors notified yet</div>
+          <div style={{fontSize:12,marginTop:4}}>Matching may still be in progress.</div>
+        </div>
+      )}
+
+      {/* ══ ACCEPTED DONORS ══ */}
+      {!loading&&accepted.length>0&&(
+        <div>
+          <div style={{fontSize:14,fontWeight:700,color:"#15803d",marginBottom:12,display:"flex",alignItems:"center",gap:7,fontFamily:"'Lora',serif"}}>
+            ✅ Accepted Donors <span style={{fontSize:13,background:"#dcfce7",color:"#15803d",borderRadius:999,padding:"1px 9px",fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{accepted.length}</span>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {accepted.map(d=>(
+              <div key={d.notificationId} style={{background:"#fff",border:"1.5px solid #86efac",borderRadius:14,padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
+                {/* Top row */}
+                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{width:44,height:44,background:"linear-gradient(135deg,#16a34a,#22c55e)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:14,flexShrink:0}}>
+                      {BLOOD_DISPLAY_H[d.bloodGroup]||d.bloodGroup}
+                    </div>
+                    <div>
+                      <div style={{fontSize:15,fontWeight:700,color:"#1a2332"}}>{d.name}</div>
+                      <div style={{fontSize:11.5,color:"#64748b",marginTop:2}}>{d.city}{d.state?`, ${d.state}`:""}</div>
+                    </div>
+                  </div>
+                  <span style={{background:"#dcfce7",color:"#15803d",border:"1px solid #86efac",borderRadius:999,padding:"3px 11px",fontSize:11.5,fontWeight:700}}>✓ Accepted</span>
+                </div>
+
+                {/* Stats grid */}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8}}>
+                  {[
+                    {icon:"🩸",label:"Blood Group",value:BLOOD_DISPLAY_H[d.bloodGroup]||d.bloodGroup},
+                    {icon:"⚖️",label:"Weight",     value:d.weight?`${d.weight} kg`:"—"},
+                    {icon:"🎂",label:"Age",         value:calcAge(d.dateOfBirth)},
+                    {icon:"📍",label:"Distance",    value:d.distanceKm!=null?`~${d.distanceKm} km`:"—"},
+                    {icon:"💉",label:"Last Donated",value:d.lastDonationDate?new Date(d.lastDonationDate).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}):"Never"},
+                    {icon:"🏅",label:"Total Donations",value:d.totalDonations??0},
+                  ].map(s=>(
+                    <div key={s.label} style={{background:"#f0fdf4",borderRadius:9,padding:"8px 11px",border:"1px solid #bbf7d0"}}>
+                      <div style={{fontSize:13,marginBottom:2}}>{s.icon}</div>
+                      <div style={{fontSize:9.5,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".4px"}}>{s.label}</div>
+                      <div style={{fontSize:13,fontWeight:700,color:"#15803d"}}>{s.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Action row */}
+                <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                  {d.phone&&(
+                    <a href={`tel:${d.phone}`} className="btn-primary" style={{display:"flex",alignItems:"center",gap:7,padding:"8px 16px",fontSize:13,textDecoration:"none",background:"linear-gradient(135deg,#16a34a,#22c55e)",boxShadow:"0 3px 12px #16a34a28"}}>
+                      📞 Call {d.phone}
+                    </a>
+                  )}
+                  {d.latitude&&d.longitude&&(
+                    <a href={`https://www.openstreetmap.org/?mlat=${d.latitude}&mlon=${d.longitude}&zoom=15`} target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{display:"flex",alignItems:"center",gap:6,fontSize:12.5,padding:"7px 14px",textDecoration:"none"}}>
+                      🗺 View on Map
+                    </a>
+                  )}
+                  <div style={{marginLeft:"auto",fontSize:11.5,color:"#94a3b8",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>
+                    <span>Notified: {fmtDT(d.sentAt)}</span>
+                    {d.respondedAt&&<span>Accepted: {fmtDT(d.respondedAt)}</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ══ ALL NOTIFIED DONORS ══ */}
+      {!loading&&others.length>0&&(
+        <div>
+          <div style={{fontSize:14,fontWeight:700,color:"#1a2332",marginBottom:12,fontFamily:"'Lora',serif"}}>
+            📋 All Notified Donors <span style={{fontSize:13,background:"#f1f5f9",color:"#64748b",borderRadius:999,padding:"1px 9px",fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{others.length}</span>
+          </div>
+          <div style={{background:"#fff",borderRadius:14,border:"1.5px solid #e8edf5",overflow:"hidden"}}>
+            {others.map((d,i)=>{
+              const st=statusStyle[d.status]||statusStyle.PENDING;
+              return(
+                <div key={d.notificationId} style={{padding:"12px 16px",borderBottom:i<others.length-1?"1px solid #f1f5f9":"none",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                  <div style={{width:36,height:36,background:"linear-gradient(135deg,#e2e8f0,#f1f5f9)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:12,color:"#475569",flexShrink:0}}>
+                    {BLOOD_DISPLAY_H[d.bloodGroup]||d.bloodGroup}
+                  </div>
+                  <div style={{flex:1,minWidth:120}}>
+                    <div style={{fontSize:13,fontWeight:600,color:"#1a2332"}}>{d.name}</div>
+                    <div style={{fontSize:11.5,color:"#94a3b8",marginTop:1}}>{d.city}{d.state?`, ${d.state}`:""} {d.distanceKm!=null?`· ~${d.distanceKm} km`:""}</div>
+                  </div>
+                  <span style={{background:st.bg,color:st.color,border:`1px solid ${st.border}`,borderRadius:999,padding:"3px 10px",fontSize:11.5,fontWeight:700,flexShrink:0}}>{st.label}</span>
+                  <div style={{fontSize:11,color:"#94a3b8",textAlign:"right",flexShrink:0}}>
+                    <div>Sent: {fmtDT(d.sentAt)}</div>
+                    {d.respondedAt&&<div>Responded: {fmtDT(d.respondedAt)}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -847,7 +908,7 @@ function normalizeRequest(r){
     distance:   r.distanceKm,
     patient:    r.patientName,
     escalation: r.escalationLevel,
-    date:       r.createdAt ? r.createdAt.split("T")[0] : "",
+    date:       r.createdAt || "",
     status:     (r.status||"").toLowerCase(),
   };
 }
@@ -863,6 +924,8 @@ function BloodRequestPage(){
   const [distance,     setDistance]     = useState(10);
   const [patientName,  setPatientName]  = useState("");
   const [notes,        setNotes]        = useState("");
+  const [contactPhone1, setContactPhone1] = useState("");
+  const [contactPhone2, setContactPhone2] = useState("");
   const [errors,       setErrors]       = useState({});
 
   /* send state */
@@ -871,17 +934,49 @@ function BloodRequestPage(){
   const [sentCount, setSentCount] = useState(0);
 
   /* request list */
-  const [requests,  setRequests]  = useState([]);
+  const [requests,    setRequests]    = useState([]);
   const [loadingReqs, setLoadingReqs] = useState(true);
-  const [tab,       setTab]       = useState("new");
-  const [cancelId,  setCancelId]  = useState(null);
+  const [refreshing,  setRefreshing]  = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [tab,         setTab]         = useState("new");
+  const [cancelId,    setCancelId]    = useState(null);
   const [cancelLoading, setCancelLoading] = useState(false);
 
-  useEffect(()=>{
+  /* detail view */
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [donorDetails,    setDonorDetails]    = useState([]);
+  const [loadingDonors,   setLoadingDonors]   = useState(false);
+  const [donorError,      setDonorError]      = useState("");
+
+  function openDetail(r) {
+    setSelectedRequest(r);
+    setDonorDetails([]);
+    setDonorError("");
+    setLoadingDonors(true);
+    getRequestDonors(token, r.id)
+      .then(data => setDonorDetails(data))
+      .catch(e  => setDonorError(e.message))
+      .finally(()=> setLoadingDonors(false));
+  }
+
+  function closeDetail() {
+    setSelectedRequest(null);
+    setDonorDetails([]);
+    setDonorError("");
+  }
+
+  function loadRequests(showSpinner = false) {
+    if (showSpinner) setRefreshing(true);
     getBloodRequests(token)
-      .then(data=>setRequests(data.map(normalizeRequest)))
+      .then(data => { setRequests(data.map(normalizeRequest)); setLastUpdated(new Date()); })
       .catch(()=>{})
-      .finally(()=>setLoadingReqs(false));
+      .finally(()=>{ setLoadingReqs(false); setRefreshing(false); });
+  }
+
+  useEffect(()=>{
+    loadRequests();
+    const interval = setInterval(() => loadRequests(), 30000);
+    return () => clearInterval(interval);
   },[]);
 
   function changeUnits(newUnits){
@@ -898,7 +993,8 @@ function BloodRequestPage(){
     if(!bloodGroup)           e.bloodGroup   = "Please select a blood group";
     if(!units||units<1)       e.units        = "At least 1 unit required";
     if(donorsNeeded<=units)   e.donorsNeeded = `Must be greater than ${units} (units required)`;
-    if(!patientName.trim())   e.patientName  = "Patient name is required";
+    if(!patientName.trim())   e.patientName    = "Patient name is required";
+    if(!contactPhone1.trim()) e.contactPhone1  = "Primary contact number is required";
     setErrors(e);
     return !Object.keys(e).length;
   }
@@ -915,13 +1011,16 @@ function BloodRequestPage(){
         distanceKm:   distance,
         patientName,
         notes,
+        contactPhone1: contactPhone1.trim() || null,
+        contactPhone2: contactPhone2.trim() || null,
       });
       const norm = normalizeRequest(created);
       setRequests(r=>[norm,...r]);
       setSentCount(norm.sent);
       setSent(true);
       setBloodGroup(""); setUnits(1); setDonorsNeeded(2);
-      setUrgency("urgent"); setDistance(10); setPatientName(""); setNotes(""); setErrors({});
+      setUrgency("urgent"); setDistance(10); setPatientName(""); setNotes("");
+      setContactPhone1(""); setContactPhone2(""); setErrors({});
     }catch(e){ setErrors({submit: e.message}); }
     finally{ setSending(false); }
   }
@@ -952,7 +1051,7 @@ function BloodRequestPage(){
       {/* ── Tabs ── */}
       <div className="fu" style={{display:"flex",background:"#f1f5f9",borderRadius:11,padding:4,gap:0}}>
         {[{key:"new",label:"📢 New Request"},{key:"history",label:"📋 History"}].map(t=>(
-          <button key={t.key} onClick={()=>{setSent(false);setTab(t.key);}}
+          <button key={t.key} onClick={()=>{setSent(false);setTab(t.key);closeDetail();}}
             style={{flex:1,padding:"8px 12px",borderRadius:8,border:"none",background:tab===t.key?"#fff":"transparent",color:tab===t.key?"#1d6fb8":"#64748b",fontWeight:600,fontSize:13,cursor:"pointer",boxShadow:tab===t.key?"0 1px 6px #00000012":"none",transition:"all .2s",fontFamily:"'Plus Jakarta Sans',sans-serif"}}>
             {t.label}
           </button>
@@ -1057,6 +1156,27 @@ function BloodRequestPage(){
               <textarea className="inp-plain" placeholder="e.g. Post-surgery, accident victim…" rows={3} value={notes}
                 onChange={e=>setNotes(e.target.value)} style={{resize:"vertical",minHeight:68}}/>
             </div>
+
+            {/* Contact phones — revealed to donor only after accept */}
+            <div style={{background:"#f0f7ff",border:"1.5px solid #bfdbfe",borderRadius:11,padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{fontSize:12.5,fontWeight:700,color:"#1d4ed8",display:"flex",alignItems:"center",gap:6}}>
+                📞 Contact Numbers for Donors
+              </div>
+              <div style={{fontSize:11.5,color:"#64748b",marginTop:-6,lineHeight:1.5}}>
+                These numbers will only be shown to a donor <strong>after they accept</strong> this request.
+              </div>
+              <div>
+                <label style={lbl}>Primary Contact Number <span style={{color:"#dc2626"}}>*</span></label>
+                <input className="inp-plain" placeholder="e.g. 9876543210" maxLength={15} value={contactPhone1}
+                  onChange={e=>{setContactPhone1(e.target.value.replace(/[^0-9+\-\s]/g,""));setErrors(er=>({...er,contactPhone1:""}));}}/>
+                {errors.contactPhone1&&<p style={{fontSize:11.5,color:"#dc2626",marginTop:4}}>⚠ {errors.contactPhone1}</p>}
+              </div>
+              <div>
+                <label style={lbl}>Secondary Contact Number (optional)</label>
+                <input className="inp-plain" placeholder="e.g. 9876543211" maxLength={15} value={contactPhone2}
+                  onChange={e=>setContactPhone2(e.target.value.replace(/[^0-9+\-\s]/g,""))}/>
+              </div>
+            </div>
           </div>
 
           {/* ── Right: Urgency + Range ── */}
@@ -1134,9 +1254,34 @@ function BloodRequestPage(){
         </div>
       </>}
 
-      {/* ══════════ HISTORY ══════════ */}
-      {tab==="history"&&(
+      {/* ══════════ HISTORY — DETAIL VIEW ══════════ */}
+      {tab==="history" && selectedRequest && (
+        <RequestDetailView
+          request={selectedRequest}
+          donors={donorDetails}
+          loading={loadingDonors}
+          error={donorError}
+          onBack={closeDetail}
+        />
+      )}
+
+      {/* ══════════ HISTORY — LIST ══════════ */}
+      {tab==="history" && !selectedRequest &&(
         <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          {/* Refresh bar */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+            <div style={{fontSize:12,color:"#94a3b8"}}>
+              {lastUpdated?"Last updated: "+lastUpdated.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit"}):"Loading…"}
+            </div>
+            <button
+              onClick={()=>loadRequests(true)}
+              disabled={refreshing||loadingReqs}
+              style={{display:"flex",alignItems:"center",gap:6,padding:"6px 14px",borderRadius:8,border:"1.5px solid #e2e8f0",background:"#fff",fontSize:12,fontWeight:600,color:"#1d6fb8",cursor:"pointer",opacity:(refreshing||loadingReqs)?0.6:1,transition:"opacity .2s"}}>
+              {refreshing
+                ?<><span style={{width:12,height:12,border:"2px solid #1d6fb866",borderTop:"2px solid #1d6fb8",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/> Refreshing…</>
+                :<>↻ Refresh</>}
+            </button>
+          </div>
           {loadingReqs&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12}}>{[0,1,2,3].map(i=><div key={i} className="skeleton" style={{height:80,borderRadius:12}}/>)}</div>}
           {/* Summary */}
           {!loadingReqs&&<div className="hist-grid fu">
@@ -1159,7 +1304,8 @@ function BloodRequestPage(){
           {/* Per-request cards */}
           {requests.map((r,i)=>(
             <div key={r.id} className={`fu d${Math.min(i+1,5)}`}
-              style={{background:"#fff",border:`1.5px solid ${urgencyBg[r.urgency]}`,borderLeft:`4px solid ${urgencyColor[r.urgency]}`,borderRadius:14,overflow:"hidden"}}>
+              style={{background:"#fff",border:`1.5px solid ${urgencyBg[r.urgency]}`,borderLeft:`4px solid ${urgencyColor[r.urgency]}`,borderRadius:14,overflow:"hidden",cursor:"pointer",transition:"box-shadow .2s"}}
+              onClick={()=>openDetail(r)}>
 
               {/* Header */}
               <div style={{padding:"14px 16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
@@ -1177,13 +1323,13 @@ function BloodRequestPage(){
                       <span>🩸 {r.blood} · {r.units} unit{r.units>1?"s":""}</span>
                       <span>👥 {r.donorsNeeded} donors needed</span>
                       <span>📡 {r.distance} km</span>
-                      <span>📅 {new Date(r.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span>
+                      <span>📅 {r.date ? (() => { const dt = new Date(r.date); return dt.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) + ", " + dt.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true}); })() : "—"}</span>
                       {r.notes&&<span>📝 {r.notes}</span>}
                       <span style={{color:"#7c3aed",fontWeight:600}}>🔺 Escalation level {r.escalation}</span>
                     </div>
                   </div>
                 </div>
-                {r.status==="active"&&<button className="btn-danger" style={{padding:"5px 12px",fontSize:12,flexShrink:0}} onClick={()=>setCancelId(r.id)}>Cancel</button>}
+                {r.status==="active"&&<button className="btn-danger" style={{padding:"5px 12px",fontSize:12,flexShrink:0}} onClick={e=>{e.stopPropagation();setCancelId(r.id);}}>Cancel</button>}
               </div>
 
               {/* Tracker */}
@@ -1228,8 +1374,13 @@ function BloodRequestPage(){
                   );
                 })()}
 
+                {/* Click hint */}
+                <div style={{marginTop:10,fontSize:11.5,color:"#1d6fb8",fontWeight:600,display:"flex",alignItems:"center",gap:4}}>
+                  👥 Click to view donor details →
+                </div>
+
                 {/* Donor goal bar */}
-                <div style={{marginTop:12,background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,padding:"10px 13px",display:"flex",alignItems:"center",gap:12}}>
+                <div style={{marginTop:8,background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,padding:"10px 13px",display:"flex",alignItems:"center",gap:12}}>
                   <div style={{fontSize:20}}>{r.accepted>=r.donorsNeeded?"🎯":"🔄"}</div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:12,fontWeight:600,color:"#1a2332",marginBottom:3}}>
@@ -1366,7 +1517,6 @@ export default function HospitalDashboard(){
             {page==="dashboard" && <DashboardPage setPage={navigate}/>}
             {page==="profile"   && <ProfilePage/>}
             {page==="broadcast" && <BloodRequestPage/>}
-            {page==="docs"      && <DocsPage/>}
             {page==="facility"  && <FacilityPage/>}
             {page==="contact"   && <ContactPage/>}
             {page==="hours"     && <HoursPage/>}

@@ -1,5 +1,6 @@
 package com.bloodbridge.api.service;
 
+import com.bloodbridge.api.dto.hospital.ChangePasswordRequest;
 import com.bloodbridge.api.dto.hospital.HospitalProfileResponse;
 import com.bloodbridge.api.entity.Hospital;
 import com.bloodbridge.api.entity.User;
@@ -8,6 +9,7 @@ import com.bloodbridge.api.repository.HospitalRepository;
 import com.bloodbridge.api.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -16,6 +18,19 @@ public class HospitalService {
 
     private final HospitalRepository hospitalRepository;
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public void changePassword(String email, ChangePasswordRequest req) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ApiException("User not found", HttpStatus.NOT_FOUND));
+
+        if (!passwordEncoder.matches(req.getCurrentPassword(), user.getPassword())) {
+            throw new ApiException("Current password is incorrect", HttpStatus.BAD_REQUEST);
+        }
+
+        user.setPassword(passwordEncoder.encode(req.getNewPassword()));
+        userRepository.save(user);
+    }
 
     public HospitalProfileResponse getProfile(String email) {
         User user = userRepository.findByEmail(email)

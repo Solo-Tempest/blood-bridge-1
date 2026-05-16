@@ -10,7 +10,12 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\adity\\\\Desktop\\\\Blood bridge\" -Recurse -Force)",
       "Bash(Select-Object FullName, PSIsContainer)",
       "Bash(Sort-Object FullName)",
-      "Bash(Format-Table -AutoSize)"
+      "Bash(Format-Table -AutoSize)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\adity\\\\Desktop\\\\Blood bridge\\\\backend\\\\src\\\\main\\\\java\\\\com\\\\bloodbridge\\\\api\\\\entity\\\\HospitalDocument.java\" -Force)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\adity\\\\Desktop\\\\Blood bridge\\\\backend\\\\src\\\\main\\\\java\\\\com\\\\bloodbridge\\\\api\\\\entity\\\\enums\\\\DocumentType.java\" -Force)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\adity\\\\Desktop\\\\Blood bridge\\\\backend\\\\src\\\\main\\\\java\\\\com\\\\bloodbridge\\\\api\\\\entity\\\\enums\\\\DocumentStatus.java\" -Force)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\adity\\\\Desktop\\\\Blood bridge\\\\backend\\\\src\\\\main\\\\java\\\\com\\\\bloodbridge\\\\api\\\\repository\\\\HospitalDocumentRepository.java\" -Force)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\adity\\\\Desktop\\\\Blood bridge\\\\backend\\\\src\\\\main\\\\java\\\\com\\\\bloodbridge\\\\api\\\\service\\\\DocumentService.java\" -Force)"
     ]
   }
 }

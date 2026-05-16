@@ -2,14 +2,19 @@ package com.bloodbridge.api.service;
 
 import com.bloodbridge.api.dto.hospital.BloodRequestCreateRequest;
 import com.bloodbridge.api.dto.hospital.BloodRequestResponse;
+import com.bloodbridge.api.dto.hospital.RequestDonorResponse;
 import com.bloodbridge.api.entity.BloodRequest;
+import com.bloodbridge.api.entity.Donor;
+import com.bloodbridge.api.entity.DonorNotification;
 import com.bloodbridge.api.entity.Hospital;
 import com.bloodbridge.api.entity.User;
 import com.bloodbridge.api.entity.enums.BloodGroup;
+import com.bloodbridge.api.entity.enums.NotificationStatus;
 import com.bloodbridge.api.entity.enums.RequestStatus;
 import com.bloodbridge.api.entity.enums.UrgencyLevel;
 import com.bloodbridge.api.exception.ApiException;
 import com.bloodbridge.api.repository.BloodRequestRepository;
+import com.bloodbridge.api.repository.DonorNotificationRepository;
 import com.bloodbridge.api.repository.HospitalRepository;
 import com.bloodbridge.api.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +31,8 @@ public class BloodRequestService {
     private final BloodRequestRepository bloodRequestRepository;
     private final HospitalRepository hospitalRepository;
     private final UserRepository userRepository;
+    private final DonorMatchingService donorMatchingService;
+    private final DonorNotificationRepository donorNotificationRepository;
 
     public List<BloodRequestResponse> getRequests(String email) {
         Hospital hospital = resolveHospital(email);
@@ -51,8 +58,6 @@ public class BloodRequestService {
             throw new ApiException("Invalid urgency level: " + req.getUrgency(), HttpStatus.BAD_REQUEST);
         }
 
-        int estimated = estimateDonors(req.getDistanceKm(), bloodGroup);
-
         BloodRequest request = BloodRequest.builder()
                 .hospital(hospital)
                 .bloodGroup(bloodGroup)
@@ -62,14 +67,18 @@ public class BloodRequestService {
                 .distanceKm(req.getDistanceKm())
                 .patientName(req.getPatientName())
                 .notes(req.getNotes())
-                .sent(estimated)
+                .contactPhone1(req.getContactPhone1())
+                .contactPhone2(req.getContactPhone2())
+                .sent(0)
                 .accepted(0)
                 .declined(0)
-                .pending(estimated)
+                .pending(0)
                 .escalationLevel(1)
                 .build();
 
-        return toResponse(bloodRequestRepository.save(request));
+        BloodRequest saved = bloodRequestRepository.save(request);
+        donorMatchingService.matchAndNotify(saved.getId());
+        return toResponse(saved);
     }
 
     @Transactional
@@ -84,9 +93,64 @@ public class BloodRequestService {
         return toResponse(bloodRequestRepository.save(request));
     }
 
-    private int estimateDonors(int distanceKm, BloodGroup bloodGroup) {
-        int bgIndex = bloodGroup.ordinal();
-        return (int) Math.round((distanceKm * 3.2) + (bgIndex * 4) + 8);
+    @Transactional(readOnly = true)
+    public List<RequestDonorResponse> getRequestDonors(String email, Long requestId) {
+        Hospital hospital = resolveHospital(email);
+        BloodRequest request = bloodRequestRepository.findByIdAndHospital(requestId, hospital)
+                .orElseThrow(() -> new ApiException("Request not found", HttpStatus.NOT_FOUND));
+
+        Double rawLat = null, rawLng = null;
+        if (hospital.getLat() != null && !hospital.getLat().isBlank()) {
+            try { rawLat = Double.parseDouble(hospital.getLat()); } catch (NumberFormatException ignored) {}
+        }
+        if (hospital.getLng() != null && !hospital.getLng().isBlank()) {
+            try { rawLng = Double.parseDouble(hospital.getLng()); } catch (NumberFormatException ignored) {}
+        }
+        final Double hLat = rawLat, hLng = rawLng;
+
+        return donorNotificationRepository.findByBloodRequestIdWithDonors(request.getId())
+                .stream().map(n -> toDonorResponse(n, hLat, hLng)).toList();
+    }
+
+    private RequestDonorResponse toDonorResponse(DonorNotification n, Double hLat, Double hLng) {
+        Donor donor = n.getDonor();
+        boolean accepted = n.getStatus() == NotificationStatus.ACCEPTED;
+
+        Double distanceKm = null;
+        if (hLat != null && hLng != null && donor.getLatitude() != null && donor.getLongitude() != null) {
+            double d = haversine(donor.getLatitude(), donor.getLongitude(), hLat, hLng);
+            distanceKm = Math.round(d * 10.0) / 10.0;
+        }
+
+        return RequestDonorResponse.builder()
+                .notificationId(n.getId())
+                .name(donor.getFullName())
+                .bloodGroup(donor.getBloodGroup().name())
+                .gender(donor.getGender().name())
+                .city(donor.getCity())
+                .state(donor.getState())
+                .distanceKm(distanceKm)
+                .status(n.getStatus().name())
+                .sentAt(n.getSentAt())
+                .respondedAt(n.getRespondedAt())
+                .phone(accepted ? donor.getUser().getPhone() : null)
+                .weight(accepted ? donor.getWeight() : null)
+                .dateOfBirth(accepted ? donor.getDateOfBirth() : null)
+                .lastDonationDate(accepted ? donor.getLastDonationDate() : null)
+                .totalDonations(accepted ? donor.getTotalDonations() : null)
+                .latitude(accepted ? donor.getLatitude() : null)
+                .longitude(accepted ? donor.getLongitude() : null)
+                .build();
+    }
+
+    private double haversine(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     private Hospital resolveHospital(String email) {
@@ -106,6 +170,8 @@ public class BloodRequestService {
                 .distanceKm(r.getDistanceKm())
                 .patientName(r.getPatientName())
                 .notes(r.getNotes())
+                .contactPhone1(r.getContactPhone1())
+                .contactPhone2(r.getContactPhone2())
                 .status(r.getStatus().name())
                 .sent(r.getSent())
                 .accepted(r.getAccepted())

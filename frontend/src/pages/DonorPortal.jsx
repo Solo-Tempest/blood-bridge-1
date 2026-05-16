@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { getDonorProfile, updateDonorProfile } from "../api/auth";
+import { getDonorProfile, updateDonorProfile, getDonorNotifications, respondToNotification } from "../api/auth";
+import L from "leaflet";
 
 /* ── Global Styles ─────────────────────────────────────────────────────── */
 const G = () => (
@@ -68,9 +69,6 @@ const G = () => (
     .tab { padding:8px 18px; border-radius:10px; font-size:12.5px; font-weight:600; cursor:pointer; border:none; background:transparent; font-family:'Sora',sans-serif; color:#9e8080; transition:all .2s; }
     .tab.active { background:#fff; color:#c62828; box-shadow:0 2px 10px #c6282820; }
 
-    .history-row { display:flex; align-items:center; gap:14px; padding:14px 0; border-bottom:1px solid #f5eded; }
-    .history-row:last-child { border-bottom:none; }
-
     .notif { display:flex; align-items:flex-start; gap:12px; padding:14px; border-radius:14px; background:#fff; border:1.5px solid #f5e5e5; }
     .notif.alert { border-color:#e5393530; background:#fffbfb; }
     .notif.info  { border-color:#42a5f530; background:#fafcff; }
@@ -119,28 +117,13 @@ function normalizeDonor(d) {
   };
 }
 
-const REQUESTS = [
-  { id:1, patient:"Priya Mehta",   blood:"B+", city:"Patna",      dist:"2 km",  urgency:"critical", date:"2025-04-24", contact:"9876543210", status:"new" },
-  { id:2, patient:"Rahul Verma",   blood:"B+", city:"Patna",      dist:"4 km",  urgency:"urgent",   date:"2025-04-23", contact:"9823456789", status:"new" },
-  { id:3, patient:"Anjali Singh",  blood:"B+", city:"Patna",      dist:"7 km",  urgency:"normal",   date:"2025-04-22", contact:"9812345678", status:"accepted" },
-  { id:4, patient:"Mohan Das",     blood:"B+", city:"Hajipur",    dist:"18 km", urgency:"urgent",   date:"2025-04-21", contact:"9801234567", status:"new" },
-  { id:5, patient:"Sita Devi",     blood:"B+", city:"Muzaffarpur",dist:"60 km", urgency:"normal",   date:"2025-04-20", contact:"9790123456", status:"completed" },
-];
-
-const HISTORY = [
-  { id:1, date:"2024-10-15", location:"PMCH, Patna",         status:"verified",  units:1 },
-  { id:2, date:"2024-06-02", location:"Red Cross, Patna",    status:"verified",  units:1 },
-  { id:3, date:"2024-01-18", location:"IGIMS, Patna",        status:"verified",  units:1 },
-  { id:4, date:"2023-09-05", location:"Blood Bank, Patna",   status:"verified",  units:1 },
-  { id:5, date:"2023-04-14", location:"PMCH, Patna",         status:"verified",  units:1 },
-];
+// REQUESTS array removed — now loaded from backend via getDonorNotifications
 
 /* ── Icons ─────────────────────────────────────────────────────────────── */
 const I = {
   home:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:17,height:17}}><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>,
   profile:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:17,height:17}}><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
   requests: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:17,height:17}}><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>,
-  history:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:17,height:17}}><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>,
   settings: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:17,height:17}}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
   logout:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:17,height:17}}><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
   drop:     <svg viewBox="0 0 24 24" fill="currentColor" style={{width:17,height:17}}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8l5 5-3 3z"/></svg>,
@@ -164,6 +147,13 @@ function formatDate(d) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-IN", { day:"numeric", month:"short", year:"numeric" });
 }
+function formatDateTime(d) {
+  if (!d) return "—";
+  const dt = new Date(d);
+  const date = dt.toLocaleDateString("en-IN", { day:"numeric", month:"short", year:"numeric" });
+  const time = dt.toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit", hour12:true });
+  return `${date}, ${time}`;
+}
 function isEligible(lastDonation) { return daysSince(lastDonation) >= 90; }
 
 const URGENCY = {
@@ -178,7 +168,6 @@ function Sidebar({ active, setActive, onLogout, donor }) {
     { key:"home",     label:"Dashboard",         icon:I.home },
     { key:"profile",  label:"My Profile",        icon:I.profile },
     { key:"requests", label:"Donation Requests",  icon:I.requests },
-    { key:"history",  label:"History",            icon:I.history },
     { key:"settings", label:"Settings",           icon:I.settings },
   ];
   return (
@@ -230,7 +219,6 @@ function MobileNav({ active, setActive }) {
     { key:"home", icon:I.home },
     { key:"profile", icon:I.profile },
     { key:"requests", icon:I.requests },
-    { key:"history", icon:I.history },
     { key:"settings", icon:I.settings },
   ];
   return (
@@ -246,8 +234,17 @@ function MobileNav({ active, setActive }) {
 }
 
 /* ── TOPBAR ─────────────────────────────────────────────────────────── */
-function TopBar({ page, onLogout }) {
-  const [notifs] = useState(2);
+function TopBar({ page, onLogout, pendingCount, notifications, onRespond, onViewAll }) {
+  const [showDrop,   setShowDrop]   = useState(false);
+  const [responding, setResponding] = useState(null);
+  const pending = (notifications || []).filter(n => n.status === "PENDING").slice(0, 5);
+
+  async function handleClick(id, action) {
+    setResponding(id + action);
+    await onRespond(id, action);
+    setResponding(null);
+  }
+
   return (
     <header style={{ background:"#fff", borderBottom:"1px solid #f5e5e5", padding:"14px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:40, backdropFilter:"blur(8px)" }}>
       <div>
@@ -257,14 +254,89 @@ function TopBar({ page, onLogout }) {
         <div style={{ fontSize:11, color:"#b8a0a0", marginTop:1 }}>{new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
       </div>
       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-        <button style={{ position:"relative", background:"#fdf8f8", border:"1.5px solid #f0dede", borderRadius:11, width:38, height:38, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"#8d6e6e" }}>
-          {I.bell}
-          {notifs > 0 && (
-            <span style={{ position:"absolute", top:7, right:7, width:7, height:7, background:"#e53935", borderRadius:"50%", border:"1.5px solid #fff" }}>
-              <span className="ping" style={{ position:"absolute", inset:0, background:"#e53935", borderRadius:"50%", display:"block" }} />
-            </span>
+
+        {/* Bell + dropdown */}
+        <div style={{ position:"relative" }}>
+          <button
+            onClick={() => setShowDrop(v => !v)}
+            style={{ position:"relative", background: showDrop ? "#fff0f0" : "#fdf8f8", border:"1.5px solid #f0dede", borderRadius:11, width:38, height:38, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:"#8d6e6e" }}
+          >
+            {I.bell}
+            {pendingCount > 0 && (
+              <span style={{ position:"absolute", top:7, right:7, width:7, height:7, background:"#e53935", borderRadius:"50%", border:"1.5px solid #fff" }}>
+                <span className="ping" style={{ position:"absolute", inset:0, background:"#e53935", borderRadius:"50%", display:"block" }} />
+              </span>
+            )}
+          </button>
+
+          {showDrop && (
+            <>
+              <div style={{ position:"fixed", inset:0, zIndex:99 }} onClick={() => setShowDrop(false)} />
+              <div className="fi" style={{ position:"absolute", right:0, top:46, width:320, background:"#fff", borderRadius:16, border:"1.5px solid #f5e5e5", boxShadow:"0 16px 48px #00000018", zIndex:100, overflow:"hidden" }}>
+                {/* Header */}
+                <div style={{ padding:"14px 16px", borderBottom:"1px solid #f5eded", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <span style={{ fontSize:13, fontWeight:700, color:"#2d1f1f", display:"flex", alignItems:"center", gap:6 }}>{I.bell} Notifications</span>
+                  {pendingCount > 0 && <span className="badge badge-red">{pendingCount} new</span>}
+                </div>
+
+                {/* Items */}
+                {pending.length === 0 ? (
+                  <div style={{ padding:"28px 16px", textAlign:"center", color:"#b8a0a0" }}>
+                    <div style={{ fontSize:26, marginBottom:6 }}>🩺</div>
+                    <div style={{ fontSize:12.5, fontWeight:500 }}>No pending requests</div>
+                  </div>
+                ) : (
+                  <div>
+                    {pending.map(n => {
+                      const blood = BLOOD_DISPLAY[n.bloodGroup] || n.bloodGroup;
+                      const urg   = URGENCY_MAP[n.urgency] || URGENCY_MAP.NORMAL;
+                      const key   = n.id;
+                      return (
+                        <div key={key} style={{ padding:"11px 14px", borderBottom:"1px solid #f5eded", display:"flex", alignItems:"center", gap:10 }}>
+                          <div style={{ width:36, height:36, background:"linear-gradient(135deg,#c62828,#e53935)", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:800, fontSize:12, flexShrink:0 }}>
+                            {blood}
+                          </div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:12.5, fontWeight:600, color:"#2d1f1f", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>Hospital in {n.hospitalCity}</div>
+                            <div style={{ fontSize:11, color:"#9e8080", marginTop:1 }}>
+                              <span className={`badge ${urg.cls}`} style={{ fontSize:10, padding:"2px 7px" }}>{urg.label}</span>
+                            </div>
+                          </div>
+                          <div style={{ display:"flex", gap:5, flexShrink:0 }}>
+                            <button
+                              style={{ width:28, height:28, border:"1.5px solid #e0d0d0", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:13, color:"#9e8080", display:"flex", alignItems:"center", justifyContent:"center" }}
+                              disabled={!!responding}
+                              onClick={() => handleClick(n.id, "DECLINE")}
+                              title="Decline"
+                            >✗</button>
+                            <button
+                              style={{ width:28, height:28, border:"none", borderRadius:8, background:"linear-gradient(135deg,#c62828,#e53935)", cursor:"pointer", fontSize:13, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 2px 8px #c6282830" }}
+                              disabled={!!responding}
+                              onClick={() => handleClick(n.id, "ACCEPT")}
+                              title="Accept"
+                            >{responding === n.id+"ACCEPT" ? "…" : "✓"}</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div style={{ padding:"11px 14px", borderTop:"1px solid #f5eded" }}>
+                  <button
+                    className="btn-outline"
+                    style={{ width:"100%", fontSize:12, padding:"8px" }}
+                    onClick={() => { setShowDrop(false); onViewAll(); }}
+                  >
+                    View all requests →
+                  </button>
+                </div>
+              </div>
+            </>
           )}
-        </button>
+        </div>
+
         <button onClick={onLogout} style={{ background:"#fff5f5", border:"1.5px solid #ffcdd2", borderRadius:11, padding:"7px 14px", fontSize:12, fontWeight:600, color:"#c62828", cursor:"pointer", display:"flex", alignItems:"center", gap:6, fontFamily:"'Sora',sans-serif" }} className="mobile-nav">
           {I.logout} Logout
         </button>
@@ -274,11 +346,11 @@ function TopBar({ page, onLogout }) {
 }
 
 /* ── HOME PAGE ──────────────────────────────────────────────────────── */
-function HomePage({ setPage, donor }) {
+function HomePage({ setPage, donor, pendingCount }) {
   const eligible = isEligible(donor.lastDonation);
   const days = daysSince(donor.lastDonation);
   const daysLeft = Math.max(0, 90 - days);
-  const urgentNearby = REQUESTS.filter(r => r.status === "new" && (r.urgency === "urgent" || r.urgency === "critical")).length;
+  const urgentNearby = pendingCount;
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:22 }}>
@@ -368,28 +440,24 @@ function HomePage({ setPage, donor }) {
         </div>
       </div>
 
-      {/* Recent requests preview */}
+      {/* Pending requests preview */}
       <div className="card fu delay-4">
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
-          <span style={{ fontSize:14, fontWeight:700, color:"#3d2c2c", fontFamily:"'Crimson Pro',serif" }}>New Requests Near You</span>
+          <span style={{ fontSize:14, fontWeight:700, color:"#3d2c2c", fontFamily:"'Crimson Pro',serif" }}>New Requests For You</span>
           <button className="btn-outline" style={{ padding:"6px 14px", fontSize:12 }} onClick={() => setPage("requests")}>View all</button>
         </div>
-        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {REQUESTS.filter(r=>r.status==="new").slice(0,3).map((r,i) => (
-            <div key={r.id} className={`request-card ${r.urgency}`} style={{ padding:"12px 14px" }}>
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:8 }}>
-                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                  <div style={{ width:34, height:34, background:"linear-gradient(135deg,#c62828,#e53935)", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:800, fontSize:13, flexShrink:0 }}>{r.blood}</div>
-                  <div>
-                    <div style={{ fontSize:13, fontWeight:600, color:"#3d2c2c" }}>{r.patient}</div>
-                    <div style={{ fontSize:11, color:"#9e8080", display:"flex", alignItems:"center", gap:4, marginTop:1 }}>{I.loc}{r.city} · {r.dist}</div>
-                  </div>
-                </div>
-                <span className={`badge ${URGENCY[r.urgency].cls}`}>{URGENCY[r.urgency].label}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        {urgentNearby === 0 ? (
+          <div style={{ textAlign:"center", padding:"20px 0", color:"#b8a0a0" }}>
+            <div style={{ fontSize:28, marginBottom:6 }}>🩺</div>
+            <div style={{ fontSize:13, fontWeight:500 }}>No pending requests right now</div>
+          </div>
+        ) : (
+          <div style={{ textAlign:"center", padding:"14px 0" }}>
+            <div style={{ fontSize:28, marginBottom:6 }}>🚨</div>
+            <div style={{ fontSize:13, fontWeight:600, color:"#c62828" }}>{urgentNearby} pending request{urgentNearby>1?"s":""} waiting for you</div>
+            <button className="btn-red" style={{ marginTop:12, padding:"8px 20px", fontSize:12 }} onClick={()=>setPage("requests")}>Respond Now →</button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -585,31 +653,103 @@ function ProfilePage({ donor, onProfileUpdated }) {
   );
 }
 
+/* ── NOTIF MAP ──────────────────────────────────────────────────────── */
+function NotifMap({ lat, lng, isApprox }) {
+  const divRef = useRef(null);
+
+  useEffect(() => {
+    if (!divRef.current || lat == null || lng == null) return;
+
+    // Inject Leaflet CSS once
+    if (!document.getElementById("leaflet-css-portal")) {
+      const link = document.createElement("link");
+      link.id   = "leaflet-css-portal";
+      link.rel  = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(link);
+    }
+
+    const map = L.map(divRef.current, { zoomControl: true, attributionControl: false })
+      .setView([lat, lng], isApprox ? 13 : 15);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+    }).addTo(map);
+
+    if (isApprox) {
+      L.circle([lat, lng], {
+        radius: 1500,
+        color: "#c62828",
+        fillColor: "#e53935",
+        fillOpacity: 0.12,
+        weight: 2,
+        dashArray: "6 4",
+      }).addTo(map);
+      L.marker([lat, lng], {
+        icon: L.divIcon({
+          html: `<div style="width:14px;height:14px;background:#c62828;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 8px rgba(198,40,40,.5)"></div>`,
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
+          className: "",
+        }),
+      }).addTo(map).bindPopup("Approximate area").openPopup();
+    } else {
+      const icon = L.divIcon({
+        html: `<div style="width:16px;height:16px;background:#c62828;border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 10px rgba(198,40,40,.6)"></div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+        className: "",
+      });
+      L.marker([lat, lng], { icon }).addTo(map).bindPopup("Hospital Location").openPopup();
+    }
+
+    return () => { map.remove(); };
+  }, [lat, lng, isApprox]);
+
+  if (lat == null || lng == null) return (
+    <div style={{ height: 180, borderRadius: 12, background: "#f5eded", display: "flex", alignItems: "center", justifyContent: "center", color: "#b8a0a0", fontSize: 12 }}>
+      📍 Location not available
+    </div>
+  );
+
+  return <div ref={divRef} style={{ height: 200, borderRadius: 12, overflow: "hidden", border: "1.5px solid #f0dede" }} />;
+}
+
 /* ── REQUESTS PAGE ──────────────────────────────────────────────────── */
-function RequestsPage() {
-  const [tab,    setTab]    = useState("new");
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
-  const [accepted, setAccepted] = useState([]);
-  const [completed, setCompleted] = useState([]);
+const URGENCY_MAP = {
+  CRITICAL: { label:"Critical", cls:"badge-red",   cardCls:"critical" },
+  URGENT:   { label:"Urgent",   cls:"badge-amber",  cardCls:"urgent" },
+  NORMAL:   { label:"Normal",   cls:"badge-green",  cardCls:"normal" },
+};
+
+function RequestsPage({ notifications = [], onRespond }) {
+  const [tab,        setTab]        = useState("PENDING");
+  const [responding, setResponding] = useState(null);
+  const [filter,     setFilter]     = useState("all");
+  const [expandedId, setExpandedId] = useState(null);
+
+  async function respond(id, action) {
+    setResponding(id);
+    try {
+      await onRespond(id, action);
+    } finally {
+      setResponding(null);
+    }
+  }
 
   const tabs = [
-    { key:"new",       label:"New Requests" },
-    { key:"accepted",  label:"Accepted" },
-    { key:"completed", label:"Completed" },
+    { key:"PENDING",  label:"New Requests" },
+    { key:"ACCEPTED", label:"Accepted" },
+    { key:"DECLINED", label:"Declined" },
   ];
 
-  const baseList = REQUESTS.filter(r => {
-    if (tab==="new")       return r.status==="new" && !accepted.includes(r.id) && !completed.includes(r.id);
-    if (tab==="accepted")  return accepted.includes(r.id);
-    if (tab==="completed") return r.status==="completed" || completed.includes(r.id);
-    return false;
-  }).filter(r => {
-    const q = search.toLowerCase();
-    const matchSearch = !q || r.patient.toLowerCase().includes(q) || r.city.toLowerCase().includes(q) || r.blood.toLowerCase().includes(q);
-    const matchFilter = filter==="all" || r.urgency===filter;
-    return matchSearch && matchFilter;
+  const list = notifications.filter(n => {
+    const matchTab    = n.status === tab;
+    const matchFilter = filter === "all" || n.urgency === filter.toUpperCase();
+    return matchTab && matchFilter;
   });
+
+  const pendingCount = notifications.filter(n => n.status === "PENDING").length;
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
@@ -618,24 +758,18 @@ function RequestsPage() {
         {tabs.map(t => (
           <button key={t.key} className={`tab${tab===t.key?" active":""}`} onClick={()=>setTab(t.key)}>
             {t.label}
-            {t.key==="new" && REQUESTS.filter(r=>r.status==="new" && !accepted.includes(r.id) && !completed.includes(r.id)).length > 0 && (
-              <span style={{ marginLeft:6, background:"#c62828", color:"#fff", borderRadius:999, fontSize:10, fontWeight:700, padding:"1px 6px" }}>
-                {REQUESTS.filter(r=>r.status==="new" && !accepted.includes(r.id) && !completed.includes(r.id)).length}
-              </span>
+            {t.key==="PENDING" && pendingCount > 0 && (
+              <span style={{ marginLeft:6, background:"#c62828", color:"#fff", borderRadius:999, fontSize:10, fontWeight:700, padding:"1px 6px" }}>{pendingCount}</span>
             )}
           </button>
         ))}
       </div>
 
-      {/* Search + filter */}
-      <div className="fu delay-1" style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-        <div style={{ position:"relative", flex:1, minWidth:180 }}>
-          <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", color:"#c8a0a0" }}>{I.search}</span>
-          <input className="inp" style={{ paddingLeft:36 }} placeholder="Search by name, city, blood group…" value={search} onChange={e=>setSearch(e.target.value)} />
-        </div>
+      {/* Filter */}
+      <div className="fu delay-1" style={{ display:"flex", gap:10 }}>
         <div style={{ position:"relative" }}>
           <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", color:"#c8a0a0" }}>{I.filter}</span>
-          <select className="inp" style={{ paddingLeft:34, minWidth:130, cursor:"pointer" }} value={filter} onChange={e=>setFilter(e.target.value)}>
+          <select className="inp" style={{ paddingLeft:34, minWidth:140, cursor:"pointer" }} value={filter} onChange={e=>setFilter(e.target.value)}>
             <option value="all">All urgency</option>
             <option value="critical">Critical</option>
             <option value="urgent">Urgent</option>
@@ -645,88 +779,200 @@ function RequestsPage() {
       </div>
 
       {/* Cards */}
-      {baseList.length === 0 ? (
+      {list.length === 0 ? (
         <div className="card fu" style={{ textAlign:"center", padding:"40px 20px", color:"#b8a0a0" }}>
           <div style={{ fontSize:40, marginBottom:10 }}>🩺</div>
-          <div style={{ fontSize:15, fontWeight:600, color:"#9e8080" }}>No requests here yet</div>
-          <div style={{ fontSize:12.5, marginTop:4 }}>Check back soon for new blood donation requests.</div>
+          <div style={{ fontSize:15, fontWeight:600, color:"#9e8080" }}>
+            {tab === "PENDING" ? "No new requests for you right now" : `No ${tab.toLowerCase()} requests`}
+          </div>
+          <div style={{ fontSize:12.5, marginTop:4 }}>Check back soon — you'll be notified when a matching request comes in.</div>
         </div>
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-          {baseList.map((r, i) => (
-            <div key={r.id} className={`request-card ${r.urgency} fu`} style={{ animationDelay:`${i*0.06}s` }}>
-              <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
-                {/* Left */}
-                <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                  <div style={{ width:46, height:46, background:"linear-gradient(135deg,#c62828,#e53935)", borderRadius:13, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:800, fontSize:15, flexShrink:0, boxShadow:"0 4px 12px #c6282840" }}>
-                    {r.blood}
-                  </div>
-                  <div>
-                    <div style={{ fontSize:14, fontWeight:700, color:"#2d1f1f" }}>{r.patient}</div>
-                    <div style={{ fontSize:11.5, color:"#9e8080", marginTop:3, display:"flex", flexWrap:"wrap", gap:8 }}>
-                      <span style={{ display:"flex", alignItems:"center", gap:3 }}>{I.loc}{r.city} · {r.dist}</span>
-                      <span style={{ display:"flex", alignItems:"center", gap:3 }}>{I.cal}{formatDate(r.date)}</span>
+          {list.map((n, i) => {
+            const urg        = URGENCY_MAP[n.urgency] || URGENCY_MAP.NORMAL;
+            const blood      = BLOOD_DISPLAY[n.bloodGroup] || n.bloodGroup;
+            const isResponding = responding === n.id;
+            const isExpanded = expandedId === n.id;
+
+            const urgencyDesc = {
+              CRITICAL: "Immediate life-threatening situation — please respond ASAP.",
+              URGENT:   "Patient needs blood within a few hours.",
+              NORMAL:   "Scheduled or non-emergency donation request.",
+            }[n.urgency] || "";
+
+            return (
+              <div key={n.id} className={`request-card ${urg.cardCls} fu`} style={{ animationDelay:`${i*0.06}s`, padding:0, overflow:"hidden" }}>
+
+                {/* ── Card header row ── */}
+                <div
+                  style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:12, flexWrap:"wrap", padding:"16px 18px", cursor:"pointer" }}
+                  onClick={() => setExpandedId(isExpanded ? null : n.id)}
+                >
+                  {/* Left */}
+                  <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                    <div style={{ width:46, height:46, background:"linear-gradient(135deg,#c62828,#e53935)", borderRadius:13, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:800, fontSize:15, flexShrink:0, boxShadow:"0 4px 12px #c6282840" }}>
+                      {blood}
+                    </div>
+                    <div>
+                      <div style={{ fontSize:14, fontWeight:700, color:"#2d1f1f" }}>
+                        {n.status === "ACCEPTED" ? n.hospitalName : `Hospital in ${n.hospitalCity}`}
+                      </div>
+                      <div style={{ fontSize:11.5, color:"#9e8080", marginTop:3, display:"flex", flexWrap:"wrap", gap:8 }}>
+                        <span style={{ display:"flex", alignItems:"center", gap:3 }}>{I.loc}{n.hospitalCity}</span>
+                        {n.distanceKm != null && <span style={{ display:"flex", alignItems:"center", gap:3 }}>~{n.distanceKm} km away</span>}
+                        <span style={{ display:"flex", alignItems:"center", gap:3 }}>{I.cal}{formatDateTime(n.sentAt)}</span>
+                      </div>
+                      {n.status === "ACCEPTED" && n.hospitalStreet && (
+                        <div style={{ fontSize:11, color:"#9e8080", marginTop:2 }}>{n.hospitalStreet}{n.hospitalArea ? `, ${n.hospitalArea}` : ""}</div>
+                      )}
+                      {n.status === "ACCEPTED" && (n.contactPhone1 || n.contactPhone2) && (
+                        <div style={{ display:"flex", flexWrap:"wrap", gap:10, marginTop:5 }}>
+                          {n.contactPhone1 && (
+                            <a href={`tel:${n.contactPhone1}`} onClick={e=>e.stopPropagation()} style={{ display:"flex", alignItems:"center", gap:5, background:"#e8f5e9", border:"1px solid #a5d6a7", borderRadius:8, padding:"4px 10px", textDecoration:"none" }}>
+                              <span style={{ fontSize:12 }}>📞</span>
+                              <span style={{ fontSize:12, fontWeight:700, color:"#2e7d32" }}>{n.contactPhone1}</span>
+                            </a>
+                          )}
+                          {n.contactPhone2 && (
+                            <a href={`tel:${n.contactPhone2}`} onClick={e=>e.stopPropagation()} style={{ display:"flex", alignItems:"center", gap:5, background:"#e3f2fd", border:"1px solid #90caf9", borderRadius:8, padding:"4px 10px", textDecoration:"none" }}>
+                              <span style={{ fontSize:12 }}>📞</span>
+                              <span style={{ fontSize:12, fontWeight:700, color:"#1565c0" }}>{n.contactPhone2}</span>
+                            </a>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
+                  {/* Right */}
+                  <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }} onClick={e=>e.stopPropagation()}>
+                    <span className={`badge ${urg.cls}`}>{urg.label}</span>
+                    <span style={{ fontSize:16, color:"#b8a0a0", cursor:"pointer", padding:"0 4px" }} onClick={()=>setExpandedId(isExpanded?null:n.id)}>
+                      {isExpanded ? "▲" : "▼"}
+                    </span>
+                    {n.status === "PENDING" && (
+                      <>
+                        <button className="btn-outline" style={{ padding:"7px 14px", fontSize:12 }} disabled={isResponding} onClick={()=>respond(n.id,"DECLINE")}>Decline</button>
+                        <button className="btn-red"     style={{ padding:"8px 16px", fontSize:12 }} disabled={isResponding} onClick={()=>respond(n.id,"ACCEPT")}>{isResponding?"…":"Accept"}</button>
+                      </>
+                    )}
+                    {n.status === "ACCEPTED" && n.hospitalLat && n.hospitalLng && (
+                      <a href={`https://www.openstreetmap.org/?mlat=${n.hospitalLat}&mlon=${n.hospitalLng}&zoom=16`} target="_blank" rel="noopener noreferrer" className="btn-red" style={{ padding:"8px 16px", fontSize:12, display:"flex", alignItems:"center", gap:5, textDecoration:"none" }}>
+                        {I.loc} View Map
+                      </a>
+                    )}
+                    {n.status === "ACCEPTED" && <span className="badge badge-green">✓ Accepted</span>}
+                    {n.status === "DECLINED" && <span className="badge badge-gray">Declined</span>}
+                  </div>
                 </div>
-                {/* Right */}
-                <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
-                  <span className={`badge ${URGENCY[r.urgency].cls}`}>{URGENCY[r.urgency].label}</span>
-                  {tab==="new" && (
-                    <>
-                      <a href={`tel:${r.contact}`} className="btn-outline" style={{ padding:"7px 14px", fontSize:12, display:"flex", alignItems:"center", gap:5, textDecoration:"none" }}>{I.phone} Call</a>
-                      <button className="btn-red" style={{ padding:"8px 16px", fontSize:12 }} onClick={()=>setAccepted(a=>[...a,r.id])}>Accept</button>
-                    </>
-                  )}
-                  {tab==="accepted" && (
-                    <button className="btn-red" style={{ padding:"8px 16px", fontSize:12, background:"linear-gradient(135deg,#2e7d32,#43a047)" }} onClick={()=>{setCompleted(c=>[...c,r.id]);setAccepted(a=>a.filter(x=>x!==r.id));}}>
-                      Mark Done ✓
-                    </button>
-                  )}
-                  {(tab==="completed" || r.status==="completed") && (
-                    <span className="badge badge-green">✓ Completed</span>
-                  )}
-                </div>
+
+                {/* ── Expanded detail panel ── */}
+                {isExpanded && (
+                  <div className="fi" style={{ borderTop:"1px solid #f5eded", padding:"18px 18px 20px", background:"#fdf9f9", display:"flex", flexDirection:"column", gap:16 }}>
+
+                    {/* Map */}
+                    <NotifMap lat={n.hospitalLat} lng={n.hospitalLng} isApprox={false} />
+
+                    {/* Key stats */}
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))", gap:10 }}>
+                      {[
+                        { icon:"🩸", label:"Blood Group", value: blood },
+                        { icon:"⚠️", label:"Urgency",     value: urg.label },
+                        { icon:"💧", label:"Units Needed", value: n.units != null ? `${n.units} unit${n.units>1?"s":""}` : "—" },
+                        { icon:"👥", label:"Donors Needed", value: n.donorsNeeded != null ? `${n.donorsNeeded} donor${n.donorsNeeded>1?"s":""}` : "—" },
+                        ...(n.distanceKm != null ? [{ icon:"📍", label:"Distance", value:`~${n.distanceKm} km` }] : []),
+                      ].map(s => (
+                        <div key={s.label} style={{ background:"#fff", borderRadius:12, border:"1px solid #f0dede", padding:"10px 12px" }}>
+                          <div style={{ fontSize:16, marginBottom:4 }}>{s.icon}</div>
+                          <div style={{ fontSize:10, fontWeight:600, color:"#b8a0a0", textTransform:"uppercase", letterSpacing:".4px", marginBottom:2 }}>{s.label}</div>
+                          <div style={{ fontSize:13.5, fontWeight:700, color:"#2d1f1f" }}>{s.value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Urgency description */}
+                    {urgencyDesc && (
+                      <div style={{ background: n.urgency==="CRITICAL"?"#fff5f5": n.urgency==="URGENT"?"#fffde7":"#f1f8f1", borderRadius:10, padding:"10px 14px", fontSize:12.5, color:"#5d4037", border:"1px solid", borderColor: n.urgency==="CRITICAL"?"#ffcdd2":n.urgency==="URGENT"?"#fff9c4":"#c8e6c9", display:"flex", gap:8, alignItems:"flex-start" }}>
+                        <span style={{ fontSize:16, flexShrink:0 }}>{n.urgency==="CRITICAL"?"🚨":n.urgency==="URGENT"?"⚡":"ℹ️"}</span>
+                        <span>{urgencyDesc}</span>
+                      </div>
+                    )}
+
+                    {/* Eligibility checklist */}
+                    <div style={{ background:"#fff", borderRadius:12, border:"1px solid #f0dede", padding:"14px 16px" }}>
+                      <div style={{ fontSize:12.5, fontWeight:700, color:"#3d2c2c", marginBottom:10 }}>✅ Before you accept, make sure you:</div>
+                      <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
+                        {[
+                          "Are between 18 and 65 years old",
+                          "Weigh at least 50 kg",
+                          "Have not donated blood in the last 90 days",
+                          "Are not currently sick, feverish, or on antibiotics",
+                          "Have eaten a light meal and are well hydrated",
+                          "Can travel to the hospital within a reasonable time",
+                        ].map(item => (
+                          <div key={item} style={{ display:"flex", alignItems:"center", gap:8, fontSize:12.5, color:"#5d4037" }}>
+                            <span style={{ width:18, height:18, background:"#e8f5e9", borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:"#2e7d32", flexShrink:0, fontWeight:700 }}>✓</span>
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Hospital notes */}
+                    {n.notes && n.notes.trim() && (
+                      <div style={{ background:"#fff", borderRadius:12, border:"1px solid #f0dede", padding:"12px 14px" }}>
+                        <div style={{ fontSize:11, fontWeight:700, color:"#b8a0a0", textTransform:"uppercase", letterSpacing:".4px", marginBottom:6 }}>📝 Hospital Note</div>
+                        <div style={{ fontSize:13, color:"#5d4037", lineHeight:1.5 }}>{n.notes}</div>
+                      </div>
+                    )}
+
+                    {/* Contact phones — shown only when ACCEPTED */}
+                    {n.status === "ACCEPTED" && (n.contactPhone1 || n.contactPhone2) && (
+                      <div style={{ background:"#f0fdf4", border:"1.5px solid #86efac", borderRadius:12, padding:"14px 16px" }}>
+                        <div style={{ fontSize:12.5, fontWeight:700, color:"#15803d", marginBottom:10, display:"flex", alignItems:"center", gap:6 }}>
+                          📞 Hospital Contact Numbers
+                        </div>
+                        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                          {n.contactPhone1 && (
+                            <a href={`tel:${n.contactPhone1}`} style={{ display:"flex", alignItems:"center", gap:10, textDecoration:"none" }}>
+                              <div style={{ width:34, height:34, background:"linear-gradient(135deg,#16a34a,#22c55e)", borderRadius:9, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                {I.phone}
+                              </div>
+                              <div>
+                                <div style={{ fontSize:10.5, fontWeight:600, color:"#64748b", letterSpacing:".4px", textTransform:"uppercase" }}>Primary</div>
+                                <div style={{ fontSize:14, fontWeight:700, color:"#15803d" }}>{n.contactPhone1}</div>
+                              </div>
+                            </a>
+                          )}
+                          {n.contactPhone2 && (
+                            <a href={`tel:${n.contactPhone2}`} style={{ display:"flex", alignItems:"center", gap:10, textDecoration:"none" }}>
+                              <div style={{ width:34, height:34, background:"linear-gradient(135deg,#0891b2,#06b6d4)", borderRadius:9, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                {I.phone}
+                              </div>
+                              <div>
+                                <div style={{ fontSize:10.5, fontWeight:600, color:"#64748b", letterSpacing:".4px", textTransform:"uppercase" }}>Secondary</div>
+                                <div style={{ fontSize:14, fontWeight:700, color:"#0e7490" }}>{n.contactPhone2}</div>
+                              </div>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action buttons at bottom of detail */}
+                    {n.status === "PENDING" && (
+                      <div style={{ display:"flex", gap:10 }}>
+                        <button className="btn-outline" style={{ flex:1, padding:"10px" }} disabled={isResponding} onClick={()=>respond(n.id,"DECLINE")}>Decline</button>
+                        <button className="btn-red"     style={{ flex:2, padding:"10px" }} disabled={isResponding} onClick={()=>respond(n.id,"ACCEPT")}>{isResponding?"Processing…":"✓ Accept & Proceed"}</button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
-    </div>
-  );
-}
-
-/* ── HISTORY PAGE ───────────────────────────────────────────────────── */
-function HistoryPage() {
-  return (
-    <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
-      <div className="card fu delay-1">
-        <div style={{ fontSize:15, fontWeight:700, color:"#3d2c2c", marginBottom:18, fontFamily:"'Crimson Pro',serif" }}>Donation History</div>
-        {HISTORY.length === 0 ? (
-          <div style={{ textAlign:"center", padding:"30px 0", color:"#b8a0a0" }}>
-            <div style={{ fontSize:36, marginBottom:8 }}>📋</div>
-            <div style={{ fontSize:14, fontWeight:600 }}>No donations yet</div>
-          </div>
-        ) : (
-          <div>
-            {HISTORY.map((h, i) => (
-              <div key={h.id} className="history-row si" style={{ animationDelay:`${i*0.07}s` }}>
-                <div style={{ width:38, height:38, background: i===0?"linear-gradient(135deg,#c62828,#e53935)":"#f5eded", borderRadius:11, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>
-                  {i===0?"🩸":"💉"}
-                </div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:"#3d2c2c" }}>{h.location}</div>
-                  <div style={{ fontSize:11.5, color:"#b8a0a0", marginTop:2 }}>{formatDate(h.date)}</div>
-                </div>
-                <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4 }}>
-                  <span className="badge badge-green" style={{ fontSize:10 }}>✓ Verified</span>
-                  <span style={{ fontSize:10.5, color:"#b8a0a0" }}>{h.units} unit</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
@@ -782,12 +1028,23 @@ function LogoutModal({ onConfirm, onCancel }) {
 /* ── ROOT ───────────────────────────────────────────────────────────── */
 export default function DonorPortal() {
   const navigate = useNavigate();
-  const [page,       setPage]       = useState("home");
-  const [showLogout, setShowLogout] = useState(false);
-  const [loggedOut,  setLoggedOut]  = useState(false);
-  const [loading,    setLoading]    = useState(true);
-  const [donor,      setDonor]      = useState(null);
-  const [fetchError, setFetchError] = useState("");
+  const [page,          setPage]          = useState("home");
+  const [showLogout,    setShowLogout]    = useState(false);
+  const [loggedOut,     setLoggedOut]     = useState(false);
+  const [loading,       setLoading]       = useState(true);
+  const [donor,         setDonor]         = useState(null);
+  const [fetchError,    setFetchError]    = useState("");
+  const [notifications, setNotifications] = useState([]);
+  const [pendingCount,  setPendingCount]  = useState(0);
+
+  function loadNotifications(token) {
+    getDonorNotifications(token)
+      .then(data => {
+        setNotifications(data);
+        setPendingCount(data.filter(n => n.status === "PENDING").length);
+      })
+      .catch(() => {});
+  }
 
   useEffect(() => {
     const token = localStorage.getItem("bb_token");
@@ -795,7 +1052,21 @@ export default function DonorPortal() {
     getDonorProfile(token)
       .then(data => { setDonor(normalizeDonor(data)); setLoading(false); })
       .catch(err  => { setFetchError(err.message);    setLoading(false); });
+    loadNotifications(token);
+    const interval = setInterval(() => loadNotifications(token), 30000);
+    return () => clearInterval(interval);
   }, []);
+
+  async function handleRespond(id, action) {
+    try {
+      const token = localStorage.getItem("bb_token");
+      const updated = await respondToNotification(token, id, action);
+      setNotifications(prev => prev.map(n => n.id === id ? updated : n));
+      setPendingCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      alert(err.message);
+    }
+  }
 
   function handleLogout() {
     localStorage.removeItem("bb_token");
@@ -855,12 +1126,11 @@ export default function DonorPortal() {
       <div style={{ minHeight:"100vh", display:"flex", background:"#faf7f5" }}>
         <Sidebar active={page} setActive={setPage} onLogout={()=>setShowLogout(true)} donor={donor} />
         <div style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0, paddingBottom:70 }}>
-          <TopBar page={page} onLogout={()=>setShowLogout(true)} />
+          <TopBar page={page} onLogout={()=>setShowLogout(true)} pendingCount={pendingCount} notifications={notifications} onRespond={handleRespond} onViewAll={()=>setPage("requests")} />
           <main style={{ flex:1, padding:"24px 20px", maxWidth:860, width:"100%" }}>
-            {page==="home"     && <HomePage     setPage={setPage} donor={donor} />}
+            {page==="home"     && <HomePage     setPage={setPage} donor={donor} pendingCount={pendingCount} />}
             {page==="profile"  && <ProfilePage  donor={donor} onProfileUpdated={setDonor} />}
-            {page==="requests" && <RequestsPage />}
-            {page==="history"  && <HistoryPage  />}
+            {page==="requests" && <RequestsPage notifications={notifications} onRespond={handleRespond} />}
             {page==="settings" && <SettingsPage />}
           </main>
         </div>

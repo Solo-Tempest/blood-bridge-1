@@ -5,12 +5,26 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="900ede8d-4bf2-4552-badd-6108bc406569" name="Changes" comment="gmail verification step complete">
+      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/controller/AuthController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/controller/AuthController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/OtpService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/OtpService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/controller/DonorController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/controller/DonorController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/controller/HospitalController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/controller/HospitalController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/dto/hospital/BloodRequestCreateRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/dto/hospital/BloodRequestCreateRequest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/dto/hospital/BloodRequestResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/dto/hospital/BloodRequestResponse.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/dto/hospital/DocumentResponse.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/entity/BloodRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/entity/BloodRequest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/entity/HospitalDocument.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/entity/enums/DocumentStatus.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/entity/enums/DocumentType.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/repository/DonorRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/repository/DonorRepository.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/repository/HospitalDocumentRepository.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/BloodRequestService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/BloodRequestService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/DocumentService.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/DonorService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/DonorService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/HospitalService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/HospitalService.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/api/auth.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/api/auth.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/DonorLogin.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/DonorLogin.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/HospitalLogin.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/HospitalLogin.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/pages/DonorPortal.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/DonorPortal.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/pages/HospitalDashboard.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/HospitalDashboard.jsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/pages/HospitalRegistration.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/HospitalRegistration.jsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />

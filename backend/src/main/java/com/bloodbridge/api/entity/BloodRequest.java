@@ -48,6 +48,12 @@ public class BloodRequest {
     @Column
     private String notes;
 
+    @Column(name = "contact_phone1")
+    private String contactPhone1;
+
+    @Column(name = "contact_phone2")
+    private String contactPhone2;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RequestStatus status;

@@ -27,4 +27,9 @@ public class BloodRequestCreateRequest {
     private String patientName;
 
     private String notes;
+
+    @NotBlank(message = "Primary contact number is required")
+    private String contactPhone1;
+
+    private String contactPhone2;
 }
