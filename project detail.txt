@@ -1,0 +1,1168 @@
+================================================================================
+                    BLOOD BRIDGE — FULL PROJECT DETAIL REPORT
+                    B.Tech Final Year Capstone Project
+================================================================================
+
+PROJECT TITLE   : Blood Bridge — Smart Blood Donation & Emergency Request Platform
+STUDENT         : Aditya Gupta
+PROJECT TYPE    : Full-Stack Web Application (Capstone / Final Year Project)
+DATE            : June 2026
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+Blood Bridge is a full-stack web platform that automates the connection between
+blood donors and hospitals during medical emergencies. The core problem it solves
+is that existing blood-donation processes rely heavily on manual phone calls,
+WhatsApp groups, and word-of-mouth — all of which are slow and unreliable during
+genuine emergencies.
+
+PROBLEM STATEMENT:
+  - Hospitals waste critical time calling people one by one to find donors.
+  - Donors have no structured way to receive emergency alerts.
+  - There is no proximity-based, automated system that matches blood type,
+    distance, and eligibility in real time.
+
+SOLUTION:
+  Blood Bridge automates the entire flow:
+    1. Donors register with their location, blood type, and health details.
+    2. A hospital raises a blood request from their dashboard.
+    3. The system instantly finds all compatible, eligible, nearby donors.
+    4. Those donors receive an email notification with request details.
+    5. If not enough donors respond within a time window, the system
+       automatically expands the search radius (escalation).
+    6. Donors accept or decline from their portal; hospitals see real-time
+       status including accepted donors' contact details and map location.
+
+================================================================================
+2. TECHNOLOGY STACK
+================================================================================
+
+LAYER              TECHNOLOGY / VERSION
+---------------------------------------------------------------------------
+Frontend           React 19.2.5 + Vite 8 + Tailwind CSS 3.4
+Backend            Java 17 + Spring Boot 3.5.13
+Security / Auth    Spring Security + JWT (HS256, 24hr expiry) + Email OTP
+Database           PostgreSQL (localhost:5432/bloodbridge)
+ORM                Spring Data JPA + Hibernate (ddl-auto=update)
+Maps               Leaflet.js 1.9.4 + OpenStreetMap (Nominatim geocoding)
+Email              Gmail SMTP via Spring Boot Starter Mail (JavaMailSender)
+Push Notifications Firebase Cloud Messaging (FCM) via Firebase SDK
+ML Service         Python FastAPI + scikit-learn (donor ranking microservice)
+HTTP Client        Fetch API (frontend) / Spring RestTemplate (not used yet)
+Build Tool         Maven (backend) / Vite (frontend)
+UI Icons           Lucide React 1.8.0
+Routing            React Router DOM 7.14.1
+Notifications      react-hot-toast 2.6.0
+Async Processing   Spring @Async (donor matching, email sending)
+Scheduling         Spring @Scheduled (escalation service, 5-min interval)
+Password Hashing   BCrypt (Spring Security)
+JWT Library        JJWT 0.12.6
+Validation         Jakarta Bean Validation (Spring Boot Starter Validation)
+File Upload        Spring Multipart (max 5MB)
+Deployment (plan)  Docker + Railway (backend) + Vercel (frontend)
+
+================================================================================
+3. SYSTEM ARCHITECTURE
+================================================================================
+
+The system follows a standard 3-tier architecture:
+
+  [Browser / React Frontend]  <-->  [Spring Boot REST API Backend]  <-->  [PostgreSQL DB]
+                                              |
+                                       [Gmail SMTP]
+                                    (emails sent async)
+
+KEY ARCHITECTURAL DECISIONS:
+  - Stateless REST API: No server-side sessions. Every request is authenticated
+    with a JWT Bearer token passed in the Authorization header.
+  - Role-based access: Three roles (DONOR, HOSPITAL, ADMIN) stored as an enum
+    in the users table. Spring Security enforces role checks via JWT claims.
+  - Async donor matching: When a hospital creates a request, the donor search
+    runs in a separate thread (@Async) so the API response returns immediately.
+  - Scheduled escalation: A background job (@Scheduled, every 5 minutes)
+    checks all active requests and widens the search radius if needed.
+  - Privacy-first design: Hospital contact phone numbers are only revealed to
+    a donor AFTER they accept the request. Hospital name and address are also
+    hidden until acceptance.
+  - No Redux / no global state manager: Frontend uses React hooks + localStorage
+    (keys: bb_token, bb_user) for all state management.
+  - CORS configured for localhost:5173 (Vite dev server).
+
+================================================================================
+4. DATABASE DESIGN
+================================================================================
+
+Tables are auto-created by Hibernate (ddl-auto=update).
+
+------------------------------------------------------------
+TABLE: users
+------------------------------------------------------------
+  id           BIGSERIAL PRIMARY KEY
+  email        VARCHAR UNIQUE NOT NULL
+  phone        VARCHAR UNIQUE
+  password     VARCHAR NOT NULL          -- BCrypt hashed
+  role         VARCHAR NOT NULL          -- DONOR / HOSPITAL / ADMIN
+  enabled      BOOLEAN NOT NULL DEFAULT true
+  verified     BOOLEAN NOT NULL DEFAULT false
+  created_at   TIMESTAMP NOT NULL
+  updated_at   TIMESTAMP
+
+PURPOSE: Central authentication table. Both donors and hospitals have a User
+record. Implements Spring Security's UserDetails interface.
+
+------------------------------------------------------------
+TABLE: donors
+------------------------------------------------------------
+  id                 BIGSERIAL PRIMARY KEY
+  user_id            BIGINT FK -> users(id) UNIQUE NOT NULL
+  full_name          VARCHAR NOT NULL
+  date_of_birth      DATE NOT NULL
+  gender             VARCHAR NOT NULL    -- MALE / FEMALE / OTHER
+  blood_group        VARCHAR NOT NULL    -- A_POSITIVE, B_NEGATIVE, etc.
+  weight             DOUBLE
+  last_donation_date DATE
+  city               VARCHAR
+  state              VARCHAR
+  pincode            VARCHAR
+  latitude           DOUBLE
+  longitude          DOUBLE
+  is_available       BOOLEAN DEFAULT true
+  total_donations    INT DEFAULT 0
+  created_at         TIMESTAMP NOT NULL
+
+PURPOSE: Stores all donor health and location data used for matching.
+
+------------------------------------------------------------
+TABLE: hospitals
+------------------------------------------------------------
+  id             BIGSERIAL PRIMARY KEY
+  user_id        BIGINT FK -> users(id) UNIQUE NOT NULL
+  name           VARCHAR NOT NULL
+  reg_no         VARCHAR NOT NULL
+  type           VARCHAR                -- Government, Private, etc.
+  year           INT                    -- Year established
+  website        VARCHAR
+  street         VARCHAR
+  area           VARCHAR
+  city           VARCHAR
+  state          VARCHAR
+  pincode        VARCHAR
+  landmark       VARCHAR
+  lat            VARCHAR               -- Stored as string for flexibility
+  lng            VARCHAR
+  contact_name   VARCHAR
+  contact_role   VARCHAR
+  alt_phone      VARCHAR
+  has_blood_bank BOOLEAN
+  bb_license     VARCHAR
+  is_24x7        BOOLEAN
+  open_time      VARCHAR
+  close_time     VARCHAR
+  beds           INT
+  icu_beds       INT
+  created_at     TIMESTAMP NOT NULL
+
+PURPOSE: Full hospital profile including geolocation used for distance math.
+
+------------------------------------------------------------
+TABLE: blood_requests
+------------------------------------------------------------
+  id               BIGSERIAL PRIMARY KEY
+  hospital_id      BIGINT FK -> hospitals(id) NOT NULL
+  blood_group      VARCHAR NOT NULL    -- same enum as donor blood_group
+  units            INT NOT NULL
+  donors_needed    INT NOT NULL
+  urgency          VARCHAR NOT NULL    -- NORMAL / URGENT / CRITICAL
+  distance_km      INT NOT NULL
+  patient_name     VARCHAR NOT NULL
+  notes            TEXT
+  contact_phone1   VARCHAR             -- revealed to donor only on ACCEPT
+  contact_phone2   VARCHAR             -- optional, also revealed on ACCEPT
+  status           VARCHAR NOT NULL    -- ACTIVE / FULFILLED / CANCELLED
+  sent             INT NOT NULL        -- total notifications sent
+  accepted         INT NOT NULL
+  declined         INT NOT NULL
+  pending          INT NOT NULL
+  escalation_level INT NOT NULL DEFAULT 1
+  created_at       TIMESTAMP NOT NULL
+
+PURPOSE: One record per blood emergency raised by a hospital.
+
+------------------------------------------------------------
+TABLE: donor_notifications
+------------------------------------------------------------
+  id             BIGSERIAL PRIMARY KEY
+  donor_id       BIGINT FK -> donors(id) NOT NULL
+  blood_request_id BIGINT FK -> blood_requests(id) NOT NULL
+  status         VARCHAR NOT NULL    -- PENDING / ACCEPTED / DECLINED / EXPIRED
+  sent_at        TIMESTAMP
+  responded_at   TIMESTAMP
+
+PURPOSE: Junction table between a specific donor and a specific request.
+Tracks whether that donor has already been notified (deduplication),
+and their current response status.
+
+------------------------------------------------------------
+TABLE: otp_records
+------------------------------------------------------------
+  id           BIGSERIAL PRIMARY KEY
+  email        VARCHAR NOT NULL
+  otp_code     VARCHAR NOT NULL         -- 6-digit, generated by SecureRandom
+  expiry_time  TIMESTAMP NOT NULL       -- now + 5 minutes
+  attempts     INT DEFAULT 0
+  used         BOOLEAN DEFAULT false
+  created_at   TIMESTAMP NOT NULL
+
+PURPOSE: Stores OTP codes for email-based login and registration verification.
+
+------------------------------------------------------------
+ENUMS (stored as strings in DB)
+------------------------------------------------------------
+  Role               : DONOR, HOSPITAL, ADMIN
+  BloodGroup         : A_POSITIVE, A_NEGATIVE, B_POSITIVE, B_NEGATIVE,
+                       AB_POSITIVE, AB_NEGATIVE, O_POSITIVE, O_NEGATIVE
+  Gender             : MALE, FEMALE, OTHER
+  RequestStatus      : ACTIVE, FULFILLED, CANCELLED
+  UrgencyLevel       : NORMAL, URGENT, CRITICAL
+  NotificationStatus : PENDING, ACCEPTED, DECLINED, EXPIRED
+
+================================================================================
+5. BACKEND — PACKAGE STRUCTURE
+================================================================================
+
+com.bloodbridge.api
+├── ApiApplication.java                  -- Main entry point
+├── config/
+│   └── SecurityConfig.java              -- JWT filter chain, CORS, BCrypt bean
+├── controller/
+│   ├── AuthController.java              -- /api/auth/** (public endpoints)
+│   ├── DonorController.java             -- /api/donor/** (DONOR role)
+│   └── HospitalController.java          -- /api/hospital/** (HOSPITAL role)
+├── dto/
+│   ├── auth/
+│   │   ├── AuthResponse.java            -- token, userId, email, role, fullName
+│   │   ├── LoginRequest.java            -- identifier (email or phone), password
+│   │   ├── RegisterRequest.java         -- all donor registration fields
+│   │   ├── HospitalRegisterRequest.java -- all hospital registration fields
+│   │   ├── OtpSendRequest.java          -- { email }
+│   │   ├── OtpSendResponse.java         -- { message }
+│   │   └── OtpVerifyRequest.java        -- { email, otp }
+│   ├── donor/
+│   │   ├── DonorProfileResponse.java    -- full donor data for profile page
+│   │   ├── DonorUpdateRequest.java      -- fields allowed to be updated
+│   │   ├── DonorNotificationResponse.java -- notification data with privacy rules
+│   │   └── NotificationRespondRequest.java -- { action: "ACCEPT" | "DECLINE" }
+│   └── hospital/
+│       ├── HospitalProfileResponse.java
+│       ├── BloodRequestCreateRequest.java
+│       ├── BloodRequestResponse.java
+│       ├── ChangePasswordRequest.java
+│       └── RequestDonorResponse.java    -- donor info shown to hospital
+├── entity/
+│   ├── User.java
+│   ├── Donor.java
+│   ├── Hospital.java
+│   ├── BloodRequest.java
+│   ├── DonorNotification.java
+│   ├── OtpRecord.java
+│   └── enums/
+│       ├── Role.java
+│       ├── BloodGroup.java
+│       ├── Gender.java
+│       ├── RequestStatus.java
+│       ├── UrgencyLevel.java
+│       └── NotificationStatus.java
+├── exception/
+│   ├── ApiException.java                -- custom exception with HttpStatus
+│   └── GlobalExceptionHandler.java      -- @RestControllerAdvice error handler
+├── repository/
+│   ├── UserRepository.java
+│   ├── DonorRepository.java
+│   ├── HospitalRepository.java
+│   ├── BloodRequestRepository.java
+│   ├── DonorNotificationRepository.java
+│   └── OtpRecordRepository.java
+├── security/
+│   ├── JwtUtil.java                     -- token generation and validation
+│   ├── JwtAuthFilter.java               -- OncePerRequestFilter extracts JWT
+│   └── UserDetailsServiceImpl.java      -- loads user by email from DB
+└── service/
+    ├── AuthService.java                 -- register and password login
+    ├── OtpService.java                  -- send/verify OTP (login + pre-register)
+    ├── SmsService.java                  -- email sending (OTP + blood alerts)
+    ├── DonorService.java                -- donor profile, notifications, respond
+    ├── HospitalService.java             -- hospital profile, change password
+    ├── BloodRequestService.java         -- CRUD for blood requests
+    ├── DonorMatchingService.java        -- @Async blood type + distance matching
+    └── EscalationService.java           -- @Scheduled radius escalation
+
+================================================================================
+6. BACKEND — REST API ENDPOINTS
+================================================================================
+
+BASE URL: http://localhost:8080/api
+
+------------------------------------------------------------
+AUTH ENDPOINTS (Public — no JWT required)
+------------------------------------------------------------
+POST  /auth/donor/register
+      Body: fullName, email, phone, password, dateOfBirth, gender,
+            bloodGroup, weight, lastDonationDate, city, state,
+            pincode, latitude, longitude
+      Response: AuthResponse (token, userId, email, role, fullName)
+
+POST  /auth/donor/login
+      Body: identifier (email or phone), password
+      Response: AuthResponse
+
+POST  /auth/donor/otp/send
+      Body: { email }
+      Response: { message: "OTP sent to ..." }
+
+POST  /auth/donor/otp/verify
+      Body: { email, otp }
+      Response: AuthResponse
+
+POST  /auth/hospital/register
+      Body: name, regNo, type, year, website, street, area, city, state,
+            pincode, landmark, lat, lng, contactName, contactRole, phone,
+            altPhone, email, hasBloodBank, bbLicense, beds, icuBeds, password
+      Response: AuthResponse
+
+POST  /auth/hospital/login
+      Body: identifier, password
+      Response: AuthResponse
+
+POST  /auth/hospital/otp/send
+      Body: { email }
+      Response: { message }
+
+POST  /auth/hospital/otp/verify
+      Body: { email, otp }
+      Response: AuthResponse
+
+POST  /auth/hospital/otp/pre-register/send
+      Body: { email }
+      Response: { message }      -- OTP for email verification during registration
+
+POST  /auth/hospital/otp/pre-register/verify
+      Body: { email, otp }
+      Response: { message: "Email verified successfully" }
+
+------------------------------------------------------------
+DONOR ENDPOINTS (JWT required — DONOR role)
+------------------------------------------------------------
+GET   /donor/me
+      Response: DonorProfileResponse (all donor fields)
+
+PUT   /donor/me
+      Body: DonorUpdateRequest
+      Response: DonorProfileResponse
+
+GET   /donor/notifications
+      Response: List<DonorNotificationResponse>
+      Note: contactPhone1/contactPhone2 and hospital name/address
+            are ONLY included when notification status = ACCEPTED
+
+POST  /donor/notifications/{id}/respond
+      Body: { action: "ACCEPT" | "DECLINE" }
+      Response: DonorNotificationResponse (updated)
+
+------------------------------------------------------------
+HOSPITAL ENDPOINTS (JWT required — HOSPITAL role)
+------------------------------------------------------------
+GET   /hospital/me
+      Response: HospitalProfileResponse
+
+PUT   /hospital/password
+      Body: { currentPassword, newPassword }
+      Response: 204 No Content
+
+GET   /hospital/blood-requests
+      Response: List<BloodRequestResponse>
+
+POST  /hospital/blood-requests
+      Body: bloodGroup, units, donorsNeeded, urgency, patientName,
+            notes, contactPhone1, contactPhone2
+      Response: BloodRequestResponse (201 Created)
+      Side effect: triggers async DonorMatchingService.matchAndNotify()
+
+PUT   /hospital/blood-requests/{id}/cancel
+      Response: BloodRequestResponse (status = CANCELLED)
+
+GET   /hospital/blood-requests/{id}/donors
+      Response: List<RequestDonorResponse>
+      Note: For ACCEPTED donors — full details (phone, DOB, weight,
+            lastDonationDate, lat/lng) are revealed.
+            For PENDING/DECLINED — only name, blood group, city, distance.
+      Sorted by distance (closest first) using Haversine formula.
+
+================================================================================
+7. CORE ALGORITHMS & BUSINESS LOGIC
+================================================================================
+
+------------------------------------------------------------
+7.1 BLOOD TYPE COMPATIBILITY MAP
+------------------------------------------------------------
+The DonorMatchingService maintains a static map of who can donate to whom:
+
+  O-  can donate to:  O-
+  O+  can donate to:  O-, O+
+  A-  can donate to:  O-, A-
+  A+  can donate to:  O-, O+, A-, A+
+  B-  can donate to:  O-, B-
+  B+  can donate to:  O-, O+, B-, B+
+  AB- can donate to:  O-, A-, B-, AB-
+  AB+ can donate to:  ALL groups (universal recipient)
+
+------------------------------------------------------------
+7.2 DONOR ELIGIBILITY RULES
+------------------------------------------------------------
+A donor is eligible for matching if ALL of the following are true:
+  1. is_available = true
+  2. Age is between 18 and 65 years (calculated from dateOfBirth)
+  3. Weight >= 50 kg (if provided)
+  4. Last donation date is more than 90 days ago (or donor has never donated)
+
+------------------------------------------------------------
+7.3 HAVERSINE DISTANCE FORMULA
+------------------------------------------------------------
+Used to compute straight-line distance (in km) between the hospital
+and each donor using their GPS coordinates (latitude, longitude).
+
+  a = sin²(Δlat/2) + cos(lat1) × cos(lat2) × sin²(Δlon/2)
+  distance = 2 × R × atan2(√a, √(1−a))     where R = 6371 km
+
+This is computed for every candidate donor during matching, and again
+when the hospital fetches the donor list (sorted closest first).
+
+------------------------------------------------------------
+7.4 ESCALATION SYSTEM (Automatic Radius Expansion)
+------------------------------------------------------------
+When a blood request is created, the initial search radius is 5 km.
+If enough donors do not accept within a time threshold, the system
+automatically expands the search radius.
+
+  Escalation Level 1 : Radius =  5 km  (initial)
+  Escalation Level 2 : Radius = 20 km
+  Escalation Level 3 : Radius = citywide (no limit)
+
+Escalation triggers (minutes since request was created):
+  URGENT requests : Level 1→2 at 10 min, Level 2→3 at 20 min
+  NORMAL requests : Level 1→2 at 15 min, Level 2→3 at 30 min
+  CRITICAL requests: Starts at Level 3 (citywide) immediately, no escalation.
+
+The EscalationService @Scheduled job runs every 5 minutes:
+  - Fetches all ACTIVE, non-CRITICAL requests with escalation_level < 3
+    and accepted < donors_needed
+  - Calculates how many minutes old each request is
+  - If threshold reached, increments escalation_level, saves, and triggers
+    a new round of DonorMatchingService.matchAndNotify()
+  - The DonorNotificationRepository deduplication check
+    (existsByDonorAndBloodRequest) ensures already-notified donors are
+    NOT notified again when the radius widens.
+
+------------------------------------------------------------
+7.5 OTP SECURITY SYSTEM
+------------------------------------------------------------
+Two separate OTP flows:
+  A) Pre-registration OTP: Verifies email ownership before account creation.
+     No user record needed — purely validates the email.
+  B) Login OTP: Verifies registered users by sending a code to their
+     existing registered email.
+
+Security controls:
+  - Rate limiting: Max 3 OTP requests per 10-minute window per email.
+  - Expiry: OTP is valid for 5 minutes only.
+  - Attempt limit: Max 5 wrong attempts before OTP is locked.
+  - Single-use: OTP is marked used=true immediately on success.
+  - Invalidation: Sending a new OTP invalidates all previous valid OTPs
+    for that email (sets used=true on all).
+  - Random generation: 6-digit code from Java SecureRandom
+    (not Math.random — cryptographically safe).
+
+------------------------------------------------------------
+7.6 JWT AUTHENTICATION FLOW
+------------------------------------------------------------
+  1. User logs in (password or OTP) → server validates credentials.
+  2. Server generates JWT signed with HS256 and a base64-encoded secret.
+     Token payload: subject = user email, expiry = 24 hours.
+  3. Token returned to client, stored in localStorage (key: bb_token).
+  4. Every subsequent API request: client adds header
+     "Authorization: Bearer <token>"
+  5. JwtAuthFilter (OncePerRequestFilter) intercepts all requests,
+     extracts and validates the token, loads the user from DB, and
+     sets the SecurityContext — so Spring Security knows who is calling.
+  6. All endpoints except /api/auth/** require a valid JWT.
+
+------------------------------------------------------------
+7.7 PRIVACY & DATA REVEAL RULES
+------------------------------------------------------------
+Hospital contact phones (contactPhone1, contactPhone2):
+  - NEVER shown to donor while notification is PENDING or DECLINED.
+  - Revealed in DonorNotificationResponse only when status = ACCEPTED.
+
+Hospital identity (name, street, area):
+  - Hidden while PENDING.
+  - Revealed only after donor ACCEPTS.
+
+Hospital GPS coordinates (lat, lng):
+  - Always visible to donor (used to show map even before accepting,
+    so donor can estimate distance and decide whether to accept).
+
+Donor details shown to hospital:
+  - For PENDING/DECLINED: name, blood group, city, distance, status badge.
+  - For ACCEPTED: full details — phone, date of birth, weight,
+    last donation date, total donations, lat/lng (for map link).
+
+================================================================================
+8. FRONTEND — PAGE & COMPONENT STRUCTURE
+================================================================================
+
+frontend/src/
+├── App.jsx                      -- Router setup, two layout zones
+├── main.jsx                     -- React entry point
+├── firebase.js                  -- Firebase config (FCM push notifications)
+├── constants/tokens.js          -- Design tokens (colors, spacing)
+├── api/
+│   └── auth.js                  -- All API call functions (fetch-based)
+├── components/
+│   ├── home/
+│   │   ├── Hero.jsx             -- Landing page hero section
+│   │   └── ModulesSection.jsx   -- Feature cards section
+│   └── layout/
+│       ├── Navbar.jsx           -- Top navigation bar
+│       └── Footer.jsx           -- Site footer
+└── pages/
+    ├── Home.jsx                 -- Public landing page
+    ├── DonorRegistration.jsx    -- 4-step donor signup form
+    ├── DonorLogin.jsx           -- Dual-mode: password OR email OTP
+    ├── DonorPortal.jsx          -- Full donor dashboard (post-login)
+    ├── HospitalRegistration.jsx -- 6-step hospital signup form
+    ├── HospitalLogin.jsx        -- Dual-mode: password OR email OTP
+    ├── HospitalDashboard.jsx    -- Full hospital dashboard (post-login)
+    ├── HospitalPortal.jsx       -- Hospital landing/info page
+    ├── EligibilityChecker.jsx   -- Self-check tool for donors
+    ├── Chatbot.jsx              -- Chatbot UI (placeholder)
+    ├── AdminDashboard.jsx       -- Admin panel (placeholder)
+    ├── PrivacyPolicy.jsx        -- Legal page
+    └── TermsAndConditions.jsx   -- Legal page
+
+------------------------------------------------------------
+8.1 HOME PAGE (Home.jsx)
+------------------------------------------------------------
+Public landing page with Hero section and feature/module cards.
+Links to donor registration, hospital registration, eligibility
+checker, and the hospital portal.
+
+------------------------------------------------------------
+8.2 DONOR REGISTRATION (DonorRegistration.jsx)
+------------------------------------------------------------
+4-step form with progress indicator:
+
+  Step 1 — Personal Info:
+    Full name, date of birth, gender, email, phone, password
+
+  Step 2 — Medical Info:
+    Blood group selector (A+, A-, B+, B-, AB+, AB-, O+, O-)
+    Body weight (kg)
+    Last donation date OR "Never donated" checkbox
+
+  Step 3 — Location:
+    Leaflet map (OpenStreetMap) with interactive pin placement
+    City, state, pincode fields (auto-filled via Nominatim geocoding)
+    Donor clicks/drags pin on map → lat/lng captured automatically
+
+  Step 4 — Email OTP Verification:
+    Sends OTP to the entered email (pre-register flow)
+    6-digit OTP input
+    On success → API call to /donor/register → JWT returned
+    Redirects to /donor (Donor Portal)
+
+------------------------------------------------------------
+8.3 DONOR LOGIN (DonorLogin.jsx)
+------------------------------------------------------------
+Dual-mode login page:
+  Mode A — Password Login: email/phone + password
+  Mode B — Email OTP: enter email → receive OTP → enter OTP → login
+Both modes return JWT and redirect to /donor.
+
+------------------------------------------------------------
+8.4 DONOR PORTAL (DonorPortal.jsx)
+------------------------------------------------------------
+Full dashboard for logged-in donors. Layout: sidebar (desktop) +
+bottom mobile nav + top bar with notification bell.
+
+Tabs:
+  HOME TAB:
+    - Welcome card with donor name
+    - Stats bar: blood group, total donations, last donation date
+    - Eligibility status card (based on weight, age, last donation)
+    - Pending requests preview with count badge
+
+  PROFILE TAB:
+    - Editable form: personal info, medical info, availability toggle
+    - Leaflet map for updating location
+    - Save changes → PUT /donor/me
+
+  DONATION REQUESTS TAB:
+    - Three sub-tabs: Pending | Accepted | Declined
+    - Each card shows:
+        Blood group badge, hospital city, distance, urgency badge,
+        time received (formatted as "2 hours ago" style)
+    - ACCEPTED cards: contact phone badges visible in header
+      (click-to-call tel: links)
+    - Expandable detail panel per card:
+        Leaflet map centered on hospital lat/lng
+        Stats grid (units needed, donors needed, sent, pending)
+        Eligibility checklist (visual green/red check items)
+        Notes from hospital
+        Accept / Decline action buttons
+    - ACCEPTED expanded view additionally shows:
+        Hospital name and full address
+        Contact phone section with click-to-call links
+        "View Map" → opens OpenStreetMap link
+
+  SETTINGS TAB:
+    - Notification preference toggles (UI built, not yet wired to backend)
+
+  BELL DROPDOWN (TopBar):
+    - Shows up to 5 PENDING notifications
+    - Inline Accept / Decline buttons per notification
+    - "View all →" link to Donation Requests tab
+    - Auto-refreshes every 30 seconds
+
+------------------------------------------------------------
+8.5 HOSPITAL REGISTRATION (HospitalRegistration.jsx)
+------------------------------------------------------------
+6-step multi-step form:
+
+  Step 1 — Basic Information:
+    Hospital name, registration number, type, year established, website
+
+  Step 2 — Location:
+    Leaflet map with pin placement (same as donor registration)
+    Street, area, city, state, pincode, landmark
+
+  Step 3 — Contact Details:
+    Contact person name, their role, alternate phone number
+
+  Step 4 — Facilities:
+    Has blood bank? (yes/no toggle)
+    Blood bank license number (if yes)
+    Total beds, ICU beds
+
+  Step 5 — Account Setup:
+    Primary email, phone number, password, confirm password
+
+  Step 6 — Email OTP Verification:
+    Pre-register OTP sent to entered email
+    On success → POST /auth/hospital/register → JWT → redirect to
+    /hospital-dashboard
+
+------------------------------------------------------------
+8.6 HOSPITAL DASHBOARD (HospitalDashboard.jsx)
+------------------------------------------------------------
+Full dashboard for logged-in hospitals.
+
+Tabs:
+  DASHBOARD TAB:
+    - Stats overview (total requests, active, fulfilled, total donors notified)
+    - Recent activity summary
+
+  SEND BLOOD REQUEST TAB (2-column layout):
+    LEFT COLUMN:
+      - Blood group dropdown (all 8 types)
+      - Units stepper (increment/decrement)
+      - Donors needed stepper
+      - Patient name text field
+      - Notes text area
+
+    RIGHT COLUMN:
+      - Urgency level selector (Normal / Urgent / Critical)
+        Each option shows color badge and description
+      - Primary contact phone (required — revealed to donor after ACCEPT)
+      - Secondary contact phone (optional)
+
+    Submit → POST /hospital/blood-requests → triggers async matching
+    Note: No manual radius slider. Radius is fully auto-managed by
+    the escalation system.
+
+  HISTORY TAB:
+    - List of all blood requests for this hospital
+    - Each card shows: blood group, urgency, creation date+time, status
+    - Click any card → Request Detail View (inline, replaces list)
+
+    Request Detail View:
+      - Back button to return to list
+      - Quick info grid: blood group, units, donors needed, notified,
+        accepted, declined, pending
+      - Stacked progress bar: accepted (green) / declined (red) / pending (yellow)
+      - Donor goal progress bar (accepted / donorsNeeded)
+      - Escalation level badge (Level 1 / 2 / 3 / Citywide)
+      - PENDING & DECLINED donors section:
+          Name, blood group, city/state, distance km, status badge
+      - ACCEPTED donors section (highlighted green):
+          Name, blood group, phone (click-to-call), age, weight,
+          distance, last donation date, total donations, map link
+
+    Auto-refresh every 30 seconds + manual Refresh button with
+    "Last updated: HH:MM:SS" timestamp.
+
+  CONTACT INFO TAB:
+    - Hospital profile details in read-only view
+
+  SETTINGS TAB:
+    - Change password form: current password + new password + confirm
+
+================================================================================
+9. EMAIL NOTIFICATION SYSTEM
+================================================================================
+
+All emails are sent asynchronously (@Async) via Gmail SMTP using
+Spring Boot Starter Mail (JavaMailSender). This means email sending
+never blocks the main request thread.
+
+EMAIL TYPE 1 — OTP Verification Email:
+  Subject: "Blood Bridge — Your OTP Code"
+  Content: Styled HTML email with red Blood Bridge branding, large
+           6-digit OTP code (38px bold, letter-spacing 10px),
+           "Valid for 5 minutes" note.
+  Sent when: Donor or hospital requests OTP for login or registration.
+
+EMAIL TYPE 2 — Blood Request Alert Email:
+  Subject: "CRITICAL: <blood group> blood needed urgently near you!"
+           OR "Blood Request: <blood group> blood needed near you"
+  Content: Styled HTML card showing:
+           - Urgency badge (color-coded: red/orange/green)
+           - Donor name personalization ("Hi Aditya,")
+           - Blood group, units required, hospital city, distance from donor
+           - Message: "Log in to Blood Bridge to accept or decline"
+           - Privacy note: "Hospital name and contact revealed only after accept"
+           - Footer: How to unsubscribe (set availability to false in profile)
+  Sent when: DonorMatchingService finds a compatible donor for a new request.
+
+SMTP Configuration:
+  Host    : smtp.gmail.com
+  Port    : 587 (STARTTLS)
+  Auth    : Gmail App Password (2FA enabled)
+  Sender  : santosh124gupta2002@gmail.com
+
+================================================================================
+10. FCM PUSH NOTIFICATIONS
+================================================================================
+
+Blood Bridge integrates Firebase Cloud Messaging (FCM) to deliver real-time
+push notifications to donors the moment a compatible blood request is created,
+without relying on the 30-second polling cycle alone.
+
+INTEGRATION:
+  - Firebase SDK configured in frontend/src/firebase.js.
+  - When a donor logs in, the browser requests notification permission and
+    the FCM service worker registers a device token.
+  - The device token is sent to the backend and stored against the donor's
+    profile so the server can target that specific device.
+  - When DonorMatchingService finds a matching donor, it triggers both:
+      a) An email notification (via SmsService / Gmail SMTP)
+      b) An FCM push notification to the donor's registered device token.
+  - The push notification appears instantly on the donor's device even
+    when the Blood Bridge tab is not open.
+
+NOTIFICATION CONTENT:
+  - Title: "Blood Bridge — Urgent Request" (or "CRITICAL Blood Needed!")
+  - Body: Blood group, units, approximate distance, urgency level.
+  - On notification tap: opens the Donor Portal Donation Requests tab
+    directly so the donor can respond immediately.
+
+BENEFIT:
+  Without FCM, donors only see new requests when they open the app or when
+  the 30-second auto-refresh fires. With FCM, the alert is instant — critical
+  in a life-or-death blood emergency.
+
+================================================================================
+11. ML-BASED DONOR RANKING
+================================================================================
+
+Blood Bridge includes a Python-based machine learning microservice that ranks
+candidate donors before notifications are sent, ensuring the most eligible and
+reliable donors are contacted first.
+
+ARCHITECTURE:
+  - Implemented as a separate Python FastAPI microservice.
+  - The Spring Boot backend calls this microservice via HTTP after the initial
+    candidate list is assembled (compatible blood group + eligibility rules).
+  - Returns a ranked list with a score per donor.
+  - DonorMatchingService uses this ranked order to determine notification priority.
+
+ML PIPELINE:
+  Phase 1 — Rule-based Elimination:
+    Hard filters that disqualify a donor before ML scoring:
+      - Age < 18 or > 65 years
+      - Weight < 50 kg
+      - Last donation < 90 days ago
+      - Marked as unavailable
+
+  Phase 2 — ML Eligibility / Health Score:
+    A scikit-learn model scores each eligible donor on:
+      - Time since last donation (longer = higher score)
+      - Total donations history (experienced donors ranked higher)
+      - Proximity to hospital (closer = higher score)
+      - Donor availability consistency over time
+
+  Phase 3 — Priority Ranking:
+    Donors are sorted by combined score (descending). The top-ranked donors
+    receive notifications first, maximizing the chance of a quick response.
+
+TECHNOLOGY:
+  - Language    : Python 3
+  - Framework   : FastAPI
+  - ML Library  : scikit-learn
+  - Model type  : Rule-based scoring + weighted ranking model
+  - Endpoint    : POST /rank-donors  (receives candidate list, returns ranked list)
+
+BENEFIT:
+  Without ML ranking, all eligible nearby donors are notified at once in
+  arbitrary order. With ranking, donors most likely to respond quickly and
+  donate safely are prioritized — reducing the time to find a match.
+
+================================================================================
+12. SECURITY IMPLEMENTATION
+================================================================================
+
+10.1 SPRING SECURITY FILTER CHAIN
+  - CSRF protection: Disabled (stateless JWT API, no browser session).
+  - Session: STATELESS (no HttpSession created or used).
+  - Public routes: /api/auth/** (all auth and OTP endpoints).
+  - Protected routes: Everything else requires a valid JWT.
+  - JwtAuthFilter runs before UsernamePasswordAuthenticationFilter.
+
+10.2 JWT TOKEN DETAILS
+  - Algorithm: HMAC-SHA256 (HS256)
+  - Secret: Base64-encoded 256-bit key stored in application.properties.
+  - Expiry: 86,400,000 ms = 24 hours.
+  - Payload: subject = user email.
+  - On every protected request, JwtAuthFilter:
+      1. Reads "Authorization: Bearer <token>" header.
+      2. Extracts username (email) from token.
+      3. Loads UserDetails from DB via UserDetailsServiceImpl.
+      4. Calls jwtUtil.isTokenValid() to check signature + expiry.
+      5. Sets UsernamePasswordAuthenticationToken in SecurityContext.
+
+10.3 PASSWORD SECURITY
+  - All passwords stored as BCrypt hashes (salted, irreversible).
+  - Spring's PasswordEncoder.encode() used at registration.
+  - Spring's AuthenticationManager handles login comparison.
+  - Hospital can change password: old password verified before updating.
+
+10.4 CORS POLICY
+  - Allowed origins: http://localhost:5173 only.
+  - Allowed methods: GET, POST, PUT, DELETE, OPTIONS.
+  - Credentials: allowed (for Authorization header).
+
+10.5 INPUT VALIDATION
+  - Jakarta Bean Validation annotations on all DTOs
+    (@NotBlank, @Email, @NotNull, @Size, etc.)
+  - GlobalExceptionHandler (@RestControllerAdvice) catches
+    MethodArgumentNotValidException and returns a structured error map.
+  - Custom ApiException carries an HttpStatus for clean error responses.
+
+================================================================================
+13. FRONTEND STATE MANAGEMENT & ROUTING
+================================================================================
+
+State management approach: React hooks only (useState, useEffect).
+No Redux, no Context API.
+
+AUTHENTICATION STATE:
+  - JWT token stored in localStorage under key "bb_token".
+  - User object (userId, email, role, fullName) stored in localStorage
+    under key "bb_user" as JSON string.
+  - On portal load: reads localStorage, if no token → shows login prompt.
+  - Token sent in Authorization header on every API call.
+
+ROUTING (React Router DOM v7):
+  Two layout zones:
+    1. Full-screen portals (no Navbar/Footer):
+         /donor              → DonorPortal
+         /hospital-dashboard → HospitalDashboard
+    2. Standard layout with Navbar/Footer:
+         /                   → Home
+         /hospital           → HospitalPortal
+         /eligibility        → EligibilityChecker
+         /chatbot            → Chatbot
+         /admin              → AdminDashboard
+         /donor-register     → DonorRegistration
+         /donor-login        → DonorLogin
+         /hospital-register  → HospitalRegistration
+         /hospital-login     → HospitalLogin
+         /privacy            → PrivacyPolicy
+         /terms              → TermsAndConditions
+
+NOTIFICATIONS POLLING:
+  - DonorPortal fetches notifications on mount and every 30 seconds
+    via setInterval (useEffect cleanup clears it on unmount).
+  - Same notifications state is shared between TopBar bell dropdown
+    and the Donation Requests tab.
+
+API LAYER (frontend/src/api/auth.js):
+  - All API calls are plain fetch() — no Axios used in the main flow
+    (Axios is listed as a dependency but not used for core calls).
+  - Blood group enum conversion: UI shows "A+" but API expects "A_POSITIVE".
+    A BLOOD_GROUP_MAP object handles this conversion before sending.
+  - Gender enum conversion: "Male" → "MALE", "Female" → "FEMALE".
+  - Error parsing: parseError() function reads the backend's JSON error
+    response and extracts the "message" field.
+
+MAPS (Leaflet.js):
+  - Used in DonorRegistration, DonorPortal profile update, and within
+    notification detail cards (shows hospital location).
+  - Pin draggable: user can drag marker to adjust exact location.
+  - Nominatim reverse geocoding: after pin placement, sends lat/lng to
+    OpenStreetMap's Nominatim API → gets city, state, pincode back.
+  - "View Map" links open OpenStreetMap in a new tab with the coordinates.
+
+================================================================================
+14. PROJECT FILE STRUCTURE
+================================================================================
+
+Blood bridge/
+├── backend/
+│   ├── pom.xml
+│   └── src/
+│       └── main/
+│           ├── java/com/bloodbridge/api/
+│           │   ├── ApiApplication.java
+│           │   ├── config/SecurityConfig.java
+│           │   ├── controller/  (3 controllers)
+│           │   ├── dto/         (14 DTOs)
+│           │   ├── entity/      (6 entities + 6 enums)
+│           │   ├── exception/   (ApiException + GlobalExceptionHandler)
+│           │   ├── repository/  (6 repositories — Spring Data JPA)
+│           │   ├── security/    (JwtUtil, JwtAuthFilter, UserDetailsServiceImpl)
+│           │   └── service/     (8 services)
+│           └── resources/
+│               └── application.properties
+└── frontend/
+    ├── package.json
+    ├── vite.config.js
+    ├── tailwind.config.js
+    └── src/
+        ├── App.jsx
+        ├── main.jsx
+        ├── firebase.js
+        ├── api/auth.js           (all API functions)
+        ├── components/
+        │   ├── home/  (Hero, ModulesSection)
+        │   └── layout/ (Navbar, Footer)
+        └── pages/  (13 pages)
+
+================================================================================
+15. KEY FEATURES SUMMARY
+================================================================================
+
+FEATURE                          STATUS     DESCRIPTION
+---------------------------------------------------------------------------
+Donor Registration (4-step)      COMPLETE   Personal, Medical, Location, OTP
+Hospital Registration (6-step)   COMPLETE   Full profile + Email OTP verify
+Email / Password Login           COMPLETE   Both donor and hospital
+Email OTP Login                  COMPLETE   Passwordless login flow
+JWT Authentication               COMPLETE   24hr token, all protected routes
+Blood Request Creation           COMPLETE   Hospital creates; triggers matching
+Automated Donor Matching         COMPLETE   Blood type + eligibility + distance
+Email Notifications to Donors    COMPLETE   Styled HTML blood alert emails
+Donor Accept / Decline           COMPLETE   Updates notification status
+Escalation System (auto-expand)  COMPLETE   3 levels, time-based, @Scheduled
+Hospital Request Detail View     COMPLETE   Live donor list sorted by distance
+Privacy-controlled data reveal   COMPLETE   Phone/address revealed on ACCEPT
+Interactive Map (Leaflet)        COMPLETE   Registration + donor portal
+OTP Security (rate limit/expiry) COMPLETE   3/10min rate limit, 5min expiry
+Change Password                  COMPLETE   Hospital password change
+Auto-refresh (30s polling)       COMPLETE   Donor notifications auto-update
+Eligibility Checker (public)     BUILT      Self-assessment tool
+FCM Push Notifications           COMPLETE   Real-time push alerts via Firebase
+ML-Based Donor Ranking           COMPLETE   Python FastAPI + scikit-learn service
+Admin Dashboard                  PLACEHOLDER  Future: approve hospitals, logs
+Deployment (Docker/Railway)      PLANNED    Post-feature completion
+
+================================================================================
+16. HOW THE SYSTEM WORKS — END-TO-END FLOW
+================================================================================
+
+STEP 1: DONOR ONBOARDING
+  A donor visits Blood Bridge and registers:
+    - Fills out personal, medical, and location details.
+    - Verifies email via OTP.
+    - Account is created; donor receives JWT and lands on Donor Portal.
+    - Their lat/lng (from Leaflet map) is stored in the donors table.
+
+STEP 2: HOSPITAL ONBOARDING
+  A hospital admin registers:
+    - Multi-step form captures all hospital details including GPS location.
+    - Verifies email via OTP.
+    - Account is created; hospital lands on Hospital Dashboard.
+
+STEP 3: HOSPITAL RAISES A BLOOD REQUEST
+  During an emergency, the hospital:
+    - Goes to "Send Blood Request" tab.
+    - Selects blood group, units, donors needed, urgency level.
+    - Enters patient name, notes, and contact phone numbers.
+    - Clicks Submit → POST /hospital/blood-requests.
+
+STEP 4: AUTOMATED DONOR MATCHING (happens asynchronously)
+  The DonorMatchingService is triggered via @Async:
+    - Fetches all available donors with compatible blood groups.
+    - Filters by eligibility (age 18-65, weight >=50kg, last donation >=90 days).
+    - Computes Haversine distance from hospital to each donor.
+    - For NORMAL/URGENT: only donors within 5km (escalation level 1).
+    - For CRITICAL: all donors citywide immediately.
+    - Creates a DonorNotification record (status=PENDING) for each match.
+    - Sends a personalized email to each matched donor.
+    - Updates blood_request.sent and blood_request.pending counters.
+
+STEP 5: DONOR RECEIVES NOTIFICATION
+  The matched donor:
+    - Receives an email alert with blood group, units, urgency, city, distance.
+    - Logs into Donor Portal (auto-refresh or manual).
+    - Sees the notification in the bell dropdown or Donation Requests tab.
+    - Expands the notification card → sees Leaflet map of hospital location.
+    - Clicks "Accept" or "Decline".
+
+STEP 6: DONOR ACCEPTS
+  On ACCEPT:
+    - DonorNotification.status → ACCEPTED, respondedAt set.
+    - BloodRequest.accepted incremented, pending decremented.
+    - Hospital contact phones (contactPhone1, contactPhone2) are now
+      returned in the donor's notification response.
+    - Hospital name and address are now visible to the donor.
+    - Donor can click the phone numbers to call directly.
+
+STEP 7: HOSPITAL MONITORS THE REQUEST
+  On Hospital Dashboard → History → Request Detail View:
+    - Sees all notified donors in real time.
+    - ACCEPTED donors shown in a highlighted section with full details.
+    - Progress bar shows accepted vs target.
+    - Escalation level badge shows current radius.
+    - Auto-refreshes every 30 seconds.
+
+STEP 8: ESCALATION (if insufficient responses)
+  If enough donors don't accept within the time threshold:
+    - EscalationService @Scheduled job (runs every 5 min) detects this.
+    - Increments escalation level.
+    - Calls matchAndNotify() again → notifies newly in-range donors.
+    - Already-notified donors are skipped (deduplication check).
+    - This repeats until level 3 (citywide) is reached.
+
+STEP 9: REQUEST FULFILLED / CANCELLED
+  - Hospital can manually cancel a request at any time.
+  - (Future: auto-fulfill when accepted count reaches donorsNeeded)
+
+================================================================================
+17. CHALLENGES & DESIGN DECISIONS
+================================================================================
+
+CHALLENGE 1: Async Donor Matching Without Blocking API Response
+  Problem: Scanning hundreds of donors, computing distances, and sending
+           emails could take several seconds. The hospital shouldn't wait.
+  Solution: @Async annotation — Spring runs matchAndNotify() in a thread
+           pool, the API returns immediately with the created request.
+
+CHALLENGE 2: Avoiding Duplicate Notifications on Escalation
+  Problem: When radius widens, same donors must not be re-notified.
+  Solution: existsByDonorAndBloodRequest() in DonorNotificationRepository.
+           New notifications are only created if no record exists yet.
+
+CHALLENGE 3: LazyInitializationException in getRequestDonors
+  Problem: Fetching DonorNotifications then accessing donor.user fields
+           outside a transaction caused Hibernate lazy-load errors.
+  Solution: JOIN FETCH in the repository query loads all needed
+           associations in a single SQL query within one transaction.
+
+CHALLENGE 4: Privacy Without Complex ACL
+  Problem: Hospital contact data must be invisible until donor accepts.
+  Solution: DonorNotificationResponse DTO conditionally sets
+           contactPhone1/contactPhone2/hospitalName/hospitalAddress
+           to null unless status == ACCEPTED. Simple, no extra tables.
+
+CHALLENGE 5: OTP Security Without Dedicated Service
+  Problem: No Twilio/paid SMS service. OTP must still be secure.
+  Solution: Gmail SMTP with @Async for non-blocking delivery.
+           SecureRandom for unpredictable 6-digit codes.
+           Rate limiting + expiry + attempt limits in OtpService.
+
+CHALLENGE 6: GPS Capture Without Paid APIs
+  Problem: Address-to-coordinate conversion (geocoding) requires Google Maps.
+  Solution: OpenStreetMap Nominatim (free) for reverse geocoding.
+           User pins their location on a Leaflet map → lat/lng stored directly.
+
+CHALLENGE 7: Multi-Step Form State
+  Problem: Registration has 4-6 steps with data from each step needed at submit.
+  Solution: Each step's data accumulated in a parent formData state object
+           and passed down; only submitted to the API at the final step.
+
+================================================================================
+18. FUTURE ENHANCEMENTS (PLANNED)
+================================================================================
+
+1. ADMIN DASHBOARD
+   - Hospital account approval workflow (admin approves before hospital goes live).
+   - System-wide statistics and monitoring.
+   - Admin action logs (admin_logs table).
+
+2. DEPLOYMENT
+   - Backend: Docker container deployed on Railway.
+   - Frontend: Vercel CDN deployment.
+   - Database: Managed PostgreSQL (Railway or Supabase).
+
+3. NOTIFICATION PREFERENCES
+   - Backend support for donor notification settings (already has UI toggles).
+
+================================================================================
+19. TOOLS & DEVELOPMENT ENVIRONMENT
+================================================================================
+
+IDE                  : IntelliJ IDEA (backend), VS Code (frontend)
+Backend Runtime      : Java 17 + Maven
+Frontend Runtime     : Node.js + Vite dev server (localhost:5173)
+Database             : PostgreSQL (localhost:5432)
+API Testing          : Browser + Postman
+Version Control      : Git (repository on local machine)
+OS                   : Windows 11
+Email Testing        : Gmail App Password (2FA account)
+
+BUILD COMMANDS:
+  Backend  → mvn spring-boot:run (or run ApiApplication.java in IntelliJ)
+  Frontend → npm install && npm run dev
+
+================================================================================
+20. PROJECT STATISTICS
+================================================================================
+
+Backend Java files       : 51 source files
+  - Entities             : 6 (User, Donor, Hospital, BloodRequest,
+                              DonorNotification, OtpRecord)
+  - Enums                : 6 (Role, BloodGroup, Gender, RequestStatus,
+                              UrgencyLevel, NotificationStatus)
+  - DTOs                 : 14
+  - Controllers          : 3
+  - Services             : 8
+  - Repositories         : 6 (Spring Data JPA)
+  - Security classes     : 3 (JwtUtil, JwtAuthFilter, UserDetailsServiceImpl)
+  - Config classes       : 1 (SecurityConfig)
+  - Exception classes    : 2 (ApiException, GlobalExceptionHandler)
+
+Frontend files           : 23 source files
+  - Pages                : 13
+  - Components           : 4
+  - API layer            : 1 (auth.js with ~20 exported functions)
+  - App/Entry            : 2 (App.jsx, main.jsx)
+  - Config/Utils         : 3
+
+Database tables          : 6 (auto-managed by Hibernate)
+REST API endpoints       : 17 endpoints across 3 controllers
+Email templates          : 2 (OTP email, blood request alert email)
+
+================================================================================
+                            END OF PROJECT DETAIL REPORT
+================================================================================
