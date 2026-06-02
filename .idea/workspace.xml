@@ -4,26 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="900ede8d-4bf2-4552-badd-6108bc406569" name="Changes" comment="gmail verification step complete">
-      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
+    <list default="true" id="900ede8d-4bf2-4552-badd-6108bc406569" name="Changes" comment="notification done and before escalation completion step">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/controller/DonorController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/controller/DonorController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/controller/HospitalController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/controller/HospitalController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/ApiApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/ApiApplication.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/dto/hospital/BloodRequestCreateRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/dto/hospital/BloodRequestCreateRequest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/dto/hospital/BloodRequestResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/dto/hospital/BloodRequestResponse.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/dto/hospital/DocumentResponse.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/entity/BloodRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/entity/BloodRequest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/entity/HospitalDocument.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/entity/enums/DocumentStatus.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/entity/enums/DocumentType.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/repository/DonorRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/repository/DonorRepository.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/repository/HospitalDocumentRepository.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/repository/BloodRequestRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/repository/BloodRequestRepository.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/BloodRequestService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/BloodRequestService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/DocumentService.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/DonorService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/DonorService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/HospitalService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/HospitalService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/SmsService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/com/bloodbridge/api/service/SmsService.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/api/auth.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/api/auth.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/DonorPortal.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/DonorPortal.jsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/pages/HospitalDashboard.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/HospitalDashboard.jsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/pages/HospitalRegistration.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/HospitalRegistration.jsx" afterDir="false" />
     </list>
@@ -60,27 +48,27 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Application.ApiApplication.executor&quot;: &quot;Run&quot;,
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
-    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/adity/Desktop/Blood bridge&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;Project&quot;,
-    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
-    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settings.project.maven.runner&quot;,
-    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Application.ApiApplication.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "git-widget-placeholder": "master",
+    "ignore.virus.scanning.warn.message": "true",
+    "junie.onboarding.icon.badge.shown": "true",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "C:/Users/adity/Desktop/Blood bridge",
+    "project.structure.last.edited": "Project",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.2",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "to.speed.mode.migration.done": "true"
   }
-}</component>
+}]]></component>
   <component name="RunManager">
     <configuration name="ApiApplication" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
       <option name="MAIN_CLASS_NAME" value="com.bloodbridge.api.ApiApplication" />
@@ -221,7 +209,15 @@
       <option name="project" value="LOCAL" />
       <updated>1778819808074</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="notification done and before escalation completion step">
+      <option name="closed" value="true" />
+      <created>1778952904606</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1778952904606</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
@@ -237,6 +233,7 @@
     <MESSAGE value="openstreet api is linked now while registeration user location can be stored" />
     <MESSAGE value="before implementing email otp feature" />
     <MESSAGE value="gmail verification step complete" />
-    <option name="LAST_COMMIT_MESSAGE" value="gmail verification step complete" />
+    <MESSAGE value="notification done and before escalation completion step" />
+    <option name="LAST_COMMIT_MESSAGE" value="notification done and before escalation completion step" />
   </component>
 </project>

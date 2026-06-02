@@ -115,8 +115,6 @@ const G = () => (
     .dash-2col{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
     .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
     @media(max-width:480px){.stat-grid{grid-template-columns:1fr 1fr}}
-    .range-btns{display:flex;justify-content:space-between;margin-top:6px;flex-wrap:wrap;gap:4px}
-
     /* stepper button shared style */
     .step-btn{width:36px;height:36px;border-radius:9px;border:1.5px solid #e2e8f0;background:#f8fafc;font-size:18px;font-weight:700;cursor:pointer;color:#475569;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
     .step-btn:hover{background:#e0f2fe;border-color:#7dd3fc}
@@ -128,14 +126,11 @@ const MOCK_H = {
   name:"",type:"",regNo:"",year:"",website:"",
   street:"",area:"",city:"",state:"",pincode:"",landmark:"",lat:"",lng:"",
   contact:"",role:"",phone:"",altPhone:"",email:"",
-  beds:null,icuBeds:null,hasBloodBank:false,is24x7:false,bbLicense:"",
+  is24x7:false,
 };
 function makeStats(H){
   const age = H.year ? `${new Date().getFullYear() - H.year} yrs active` : "";
   return [
-    {icon:"🛏️",label:"Total Beds",value:H.beds!=null?String(H.beds):"—",sub:"Operational",color:"#1d6fb8",bg:"#eff6ff"},
-    {icon:"🚨",label:"ICU / Emergency",value:H.icuBeds!=null?String(H.icuBeds):"—",sub:"Critical care",color:"#dc2626",bg:"#fef2f2"},
-    {icon:"🩸",label:"Blood Bank",value:H.hasBloodBank?"Active":"None",sub:H.hasBloodBank?"Licensed":"Not registered",color:"#0f766e",bg:"#f0fdfa"},
     {icon:"📅",label:"Est. Year",value:H.year?String(H.year):"—",sub:age,color:"#7c3aed",bg:"#f5f3ff"},
   ];
 }
@@ -348,9 +343,7 @@ function Sidebar({active,setActive,onLogout,open,onClose}){
     {key:"dashboard",label:"Overview",icon:Ico.dashboard},
     {key:"profile",label:"Hospital Profile",icon:Ico.profile},
     {key:"broadcast",label:"Send Blood Request",icon:Ico.broadcast},
-    {key:"facility",label:"Facilities",icon:Ico.facility},
     {key:"contact",label:"Contact Info",icon:Ico.contact},
-    {key:"hours",label:"Operating Hours",icon:Ico.clock},
     {key:"settings",label:"Settings",icon:Ico.settings},
   ];
   function go(k){setActive(k);onClose();}
@@ -384,7 +377,7 @@ function Sidebar({active,setActive,onLogout,open,onClose}){
 /* ── TOPBAR ── */
 function TopBar({page,setPage,onMenuClick}){
   const H = useH();
-  const labels={dashboard:"Dashboard",profile:"Hospital Profile",broadcast:"Blood Request",facility:"Facilities",contact:"Contact Info",hours:"Operating Hours",settings:"Settings"};
+  const labels={dashboard:"Dashboard",profile:"Hospital Profile",broadcast:"Blood Request",contact:"Contact Info",settings:"Settings"};
   return(
     <header className="topbar">
       <button className="hamburger" onClick={onMenuClick}>{Ico.menu}</button>
@@ -422,8 +415,7 @@ function DashboardPage({setPage}){
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             <span style={{background:"#ffffff25",border:"1px solid #ffffff30",borderRadius:999,padding:"2px 10px",fontSize:11,fontWeight:600}}>{H.type}</span>
             <span style={{fontSize:11.5,color:"#bae6fd",display:"flex",alignItems:"center",gap:4}}>{Ico.loc}{H.city}, {H.state}</span>
-            {H.hasBloodBank&&<span style={{background:"#ffffff20",border:"1px solid #ffffff30",borderRadius:999,padding:"2px 10px",fontSize:11,fontWeight:600}}>🩸 Blood Bank Active</span>}
-          </div>
+            </div>
         </div>
       </div>
       <div className="stat-grid">
@@ -439,7 +431,7 @@ function DashboardPage({setPage}){
       <div className="dash-2col">
         <div className="card fu d2">
           <SectionHead title="Quick Information" icon="🏥" onEdit={()=>setPage("profile")} editLabel="View"/>
-          {[{l:"Registration No.",v:H.regNo},{l:"Year Established",v:H.year},{l:"Website",v:H.website},{l:"Operating",v:H.is24x7?"24 × 7 (All days)":H.openTime&&H.closeTime?`${H.openTime} – ${H.closeTime}`:"—"}].map(r=>(
+          {[{l:"Registration No.",v:H.regNo},{l:"Year Established",v:H.year},{l:"Website",v:H.website}].map(r=>(
             <div key={r.l} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",borderBottom:"1px solid #f1f5f9",paddingBottom:10,marginBottom:10}}>
               <span style={{fontSize:11.5,color:"#94a3b8",fontWeight:500,flexShrink:0,marginRight:8}}>{r.l}</span>
               <span style={{fontSize:12,color:"#1a2332",fontWeight:600,textAlign:"right",wordBreak:"break-all"}}>{r.v}</span>
@@ -525,52 +517,6 @@ function ProfilePage(){
   );
 }
 
-/* ── FACILITIES ── */
-function FacilityPage(){
-  const H = useH();
-  const [form,setForm]=useState({beds:H.beds,icuBeds:H.icuBeds,hasBloodBank:H.hasBloodBank,bbLicense:H.bbLicense});
-  const [editing,setEditing]=useState(false);
-  const [saved,setSaved]=useState(false);
-  function save(){setEditing(false);setSaved(true);setTimeout(()=>setSaved(false),3000);}
-  return(
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
-      {saved&&<div className="fu" style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#15803d",fontWeight:600}}>✅ Facilities updated!</div>}
-      <div className="card fu">
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:17}}>🏥</span><span style={{fontSize:15,fontWeight:700,fontFamily:"'Lora',serif"}}>Capacity</span></div>
-          <div style={{display:"flex",gap:8}}>{editing?<><button className="btn-ghost" onClick={()=>setEditing(false)}>Cancel</button><button className="btn-primary" onClick={save}>Save</button></>:<button className="btn-ghost" onClick={()=>setEditing(true)} style={{display:"flex",alignItems:"center",gap:5}}>{Ico.edit} Edit</button>}</div>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:14}}>
-          {[{label:"Total Beds",key:"beds",icon:"🛏️",color:"#1d6fb8",bg:"#eff6ff"},{label:"ICU / Emergency",key:"icuBeds",icon:"🚨",color:"#dc2626",bg:"#fef2f2"}].map(f=>(
-            <div key={f.key} style={{background:f.bg,borderRadius:11,padding:"14px 16px",border:"1.5px solid #e2e8f0"}}>
-              <div style={{fontSize:20,marginBottom:7}}>{f.icon}</div>
-              <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>{f.label}</div>
-              {editing?<input type="number" className="inp-plain" value={form[f.key]} style={{fontSize:20,fontWeight:800,color:f.color,background:"#fff",padding:"5px 8px"}} onChange={e=>setForm(x=>({...x,[f.key]:e.target.value}))}/>:<div style={{fontSize:26,fontWeight:800,color:f.color,fontFamily:"'Lora',serif"}}>{form[f.key]}</div>}
-            </div>
-          ))}
-          <div style={{background:"#f5f3ff",borderRadius:11,padding:"14px 16px",border:"1.5px solid #e2e8f0"}}>
-            <div style={{fontSize:20,marginBottom:7}}>📊</div>
-            <div style={{fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".5px",marginBottom:4}}>ICU % of Total</div>
-            <div style={{fontSize:26,fontWeight:800,color:"#7c3aed",fontFamily:"'Lora',serif"}}>{Math.round((form.icuBeds/form.beds)*100)}%</div>
-            <div className="prog-track" style={{marginTop:7}}><div className="prog-fill" style={{width:`${Math.round((form.icuBeds/form.beds)*100)}%`,background:"linear-gradient(90deg,#7c3aed,#a78bfa)"}}/></div>
-          </div>
-        </div>
-      </div>
-      <div className="card fu d1">
-        <SectionHead title="Blood Bank" icon="🩸"/>
-        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,cursor:editing?"pointer":"default"}} onClick={()=>editing&&setForm(f=>({...f,hasBloodBank:!f.hasBloodBank}))}>
-          <div style={{width:46,height:24,background:form.hasBloodBank?"#10b981":"#e2e8f0",borderRadius:999,position:"relative",transition:"background .25s",flexShrink:0}}>
-            <div style={{position:"absolute",width:18,height:18,background:"#fff",borderRadius:"50%",top:3,left:form.hasBloodBank?24:3,transition:"left .25s"}}/>
-          </div>
-          <div><div style={{fontSize:13,fontWeight:600,color:"#1a2332"}}>Blood Bank {form.hasBloodBank?"Available":"Not Available"}</div><div style={{fontSize:11,color:"#94a3b8"}}>{form.hasBloodBank?"Licensed and operational":"Not registered"}</div></div>
-          {form.hasBloodBank&&<span className="badge badge-teal" style={{marginLeft:"auto"}}>✓ Active</span>}
-        </div>
-        {form.hasBloodBank&&<div><span style={lbl}>Blood Bank License No.</span>{editing?<input className="inp-plain" value={form.bbLicense||""} onChange={e=>setForm(f=>({...f,bbLicense:e.target.value}))}/>:<span style={val}>{form.bbLicense}</span>}</div>}
-      </div>
-    </div>
-  );
-}
-
 /* ── CONTACT ── */
 function ContactPage(){
   const H = useH();
@@ -594,48 +540,6 @@ function ContactPage(){
           <EditableField label="Alternate Phone" id="altPhone" {...fp}/>
           <div style={{gridColumn:"1/-1"}}><EditableField label="Email Address" id="email" type="email" {...fp}/></div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── HOURS ── */
-function HoursPage(){
-  const H = useH();
-  const [is24x7,setIs24x7]=useState(H.is24x7);
-  const [openTime,setOpenTime]=useState(H.openTime||"09:00");
-  const [closeTime,setCloseTime]=useState(H.closeTime||"21:00");
-  const [saved,setSaved]=useState(false);
-  return(
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
-      {saved&&<div className="fu" style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#15803d",fontWeight:600}}>✅ Hours saved!</div>}
-      <div className="card fu">
-        <SectionHead title="Operating Hours" icon="🕐"/>
-        <div style={{display:"flex",alignItems:"center",gap:10,background:"#f0fdfa",border:"1.5px solid #ccfbf1",borderRadius:11,padding:"11px 14px",marginBottom:18,cursor:"pointer"}} onClick={()=>setIs24x7(v=>!v)}>
-          <div style={{width:46,height:24,background:is24x7?"#10b981":"#e2e8f0",borderRadius:999,position:"relative",transition:"background .25s",flexShrink:0}}><div style={{position:"absolute",width:18,height:18,background:"#fff",borderRadius:"50%",top:3,left:is24x7?24:3,transition:"left .25s"}}/></div>
-          <div><div style={{fontSize:13,fontWeight:700,color:"#0f766e"}}>24 × 7 Operations</div><div style={{fontSize:11,color:"#5eead4"}}>Hospital operates round the clock</div></div>
-          {is24x7&&<span className="badge badge-teal" style={{marginLeft:"auto"}}>Active</span>}
-        </div>
-        {!is24x7&&(
-          <div className="fu" style={{background:"#f8fafc",border:"1.5px solid #e2e8f0",borderRadius:11,padding:"16px 18px",display:"flex",flexDirection:"column",gap:14}}>
-            <div style={{fontSize:12,fontWeight:600,color:"#64748b"}}>These hours apply every day (Mon – Sun)</div>
-            <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-              <div style={{display:"flex",flexDirection:"column",gap:4,flex:1,minWidth:120}}>
-                <span style={{fontSize:10.5,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".6px"}}>Opening Time</span>
-                <input type="time" className="inp-plain" value={openTime} onChange={e=>setOpenTime(e.target.value)} style={{fontSize:14,fontWeight:600}}/>
-              </div>
-              <div style={{fontSize:18,color:"#94a3b8",marginTop:18,flexShrink:0}}>→</div>
-              <div style={{display:"flex",flexDirection:"column",gap:4,flex:1,minWidth:120}}>
-                <span style={{fontSize:10.5,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".6px"}}>Closing Time</span>
-                <input type="time" className="inp-plain" value={closeTime} onChange={e=>setCloseTime(e.target.value)} style={{fontSize:14,fontWeight:600}}/>
-              </div>
-            </div>
-            <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:9,padding:"9px 13px",fontSize:12,color:"#1d6fb8",fontWeight:500}}>
-              🕐 All days: <strong>{openTime}</strong> – <strong>{closeTime}</strong>
-            </div>
-          </div>
-        )}
-        <div style={{marginTop:16}}><button className="btn-primary" onClick={()=>{setSaved(true);setTimeout(()=>setSaved(false),3000);}}>Save Schedule</button></div>
       </div>
     </div>
   );
@@ -765,7 +669,6 @@ function RequestDetailView({ request: r, donors, loading, error, onBack }){
           {icon:"🩸",label:"Blood Group",  value:r.blood},
           {icon:"💧",label:"Units",        value:`${r.units} unit${r.units>1?"s":""}`},
           {icon:"👥",label:"Donors Needed",value:r.donorsNeeded},
-          {icon:"📡",label:"Range",        value:`${r.distance} km`},
           {icon:"📤",label:"Notified",     value:r.sent},
           {icon:"✅",label:"Accepted",     value:r.accepted},
           {icon:"❌",label:"Declined",     value:r.declined},
@@ -905,7 +808,6 @@ function normalizeRequest(r){
     ...r,
     blood:      BG_LABEL[r.bloodGroup] || r.bloodGroup,
     urgency:    (r.urgency||"").toLowerCase(),
-    distance:   r.distanceKm,
     patient:    r.patientName,
     escalation: r.escalationLevel,
     date:       r.createdAt || "",
@@ -915,13 +817,13 @@ function normalizeRequest(r){
 
 function BloodRequestPage(){
   const token = localStorage.getItem("bb_token");
+  const topRef = useRef(null);
 
   /* form state */
   const [bloodGroup,   setBloodGroup]   = useState("");
   const [units,        setUnits]        = useState(1);
   const [donorsNeeded, setDonorsNeeded] = useState(2);
   const [urgency,      setUrgency]      = useState("urgent");
-  const [distance,     setDistance]     = useState(10);
   const [patientName,  setPatientName]  = useState("");
   const [notes,        setNotes]        = useState("");
   const [contactPhone1, setContactPhone1] = useState("");
@@ -984,10 +886,6 @@ function BloodRequestPage(){
     if(donorsNeeded <= newUnits) setDonorsNeeded(newUnits + 1);
   }
 
-  const estimatedDonors = bloodGroup
-    ? Math.floor((distance * 3.2) + (BLOOD_GROUPS.indexOf(bloodGroup) * 4) + 8)
-    : 0;
-
   function validate(){
     const e={};
     if(!bloodGroup)           e.bloodGroup   = "Please select a blood group";
@@ -1008,7 +906,6 @@ function BloodRequestPage(){
         units,
         donorsNeeded,
         urgency:      urgency.toUpperCase(),
-        distanceKm:   distance,
         patientName,
         notes,
         contactPhone1: contactPhone1.trim() || null,
@@ -1018,8 +915,9 @@ function BloodRequestPage(){
       setRequests(r=>[norm,...r]);
       setSentCount(norm.sent);
       setSent(true);
+      setTimeout(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
       setBloodGroup(""); setUnits(1); setDonorsNeeded(2);
-      setUrgency("urgent"); setDistance(10); setPatientName(""); setNotes("");
+      setUrgency("urgent"); setPatientName(""); setNotes("");
       setContactPhone1(""); setContactPhone2(""); setErrors({});
     }catch(e){ setErrors({submit: e.message}); }
     finally{ setSending(false); }
@@ -1046,7 +944,7 @@ function BloodRequestPage(){
   );
 
   return(
-    <div style={{display:"flex",flexDirection:"column",gap:18}}>
+    <div ref={topRef} style={{display:"flex",flexDirection:"column",gap:18}}>
 
       {/* ── Tabs ── */}
       <div className="fu" style={{display:"flex",background:"#f1f5f9",borderRadius:11,padding:4,gap:0}}>
@@ -1070,7 +968,7 @@ function BloodRequestPage(){
               <div style={{fontSize:32,flexShrink:0}}>✅</div>
               <div>
                 <div style={{fontSize:14,fontWeight:700,color:"#15803d",marginBottom:3}}>Blood request sent successfully!</div>
-                <div style={{fontSize:12.5,color:"#166534"}}><strong>{sentCount} donors</strong> within <strong>{distance} km</strong> have been notified.</div>
+                <div style={{fontSize:12.5,color:"#166534"}}><strong>{sentCount} donors</strong> have been notified.</div>
                 <button onClick={()=>setSent(false)} className="btn-ghost" style={{marginTop:8,padding:"5px 12px",fontSize:12}}>Send another</button>
               </div>
             </div>
@@ -1157,29 +1055,9 @@ function BloodRequestPage(){
                 onChange={e=>setNotes(e.target.value)} style={{resize:"vertical",minHeight:68}}/>
             </div>
 
-            {/* Contact phones — revealed to donor only after accept */}
-            <div style={{background:"#f0f7ff",border:"1.5px solid #bfdbfe",borderRadius:11,padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
-              <div style={{fontSize:12.5,fontWeight:700,color:"#1d4ed8",display:"flex",alignItems:"center",gap:6}}>
-                📞 Contact Numbers for Donors
-              </div>
-              <div style={{fontSize:11.5,color:"#64748b",marginTop:-6,lineHeight:1.5}}>
-                These numbers will only be shown to a donor <strong>after they accept</strong> this request.
-              </div>
-              <div>
-                <label style={lbl}>Primary Contact Number <span style={{color:"#dc2626"}}>*</span></label>
-                <input className="inp-plain" placeholder="e.g. 9876543210" maxLength={15} value={contactPhone1}
-                  onChange={e=>{setContactPhone1(e.target.value.replace(/[^0-9+\-\s]/g,""));setErrors(er=>({...er,contactPhone1:""}));}}/>
-                {errors.contactPhone1&&<p style={{fontSize:11.5,color:"#dc2626",marginTop:4}}>⚠ {errors.contactPhone1}</p>}
-              </div>
-              <div>
-                <label style={lbl}>Secondary Contact Number (optional)</label>
-                <input className="inp-plain" placeholder="e.g. 9876543211" maxLength={15} value={contactPhone2}
-                  onChange={e=>setContactPhone2(e.target.value.replace(/[^0-9+\-\s]/g,""))}/>
-              </div>
-            </div>
           </div>
 
-          {/* ── Right: Urgency + Range ── */}
+          {/* ── Right: Urgency + Contact Phones ── */}
           <div style={{display:"flex",flexDirection:"column",gap:16}}>
 
             {/* Urgency */}
@@ -1199,37 +1077,27 @@ function BloodRequestPage(){
               </div>
             </div>
 
-            {/* Range */}
-            <div className="card fu d3">
-              <div style={{fontSize:14,fontWeight:700,fontFamily:"'Lora',serif",color:"#1a2332",marginBottom:4}}>📡 Notification Range</div>
-              <div style={{fontSize:11.5,color:"#94a3b8",marginBottom:12}}>All eligible donors within this radius will be alerted</div>
-              <div style={{marginBottom:12}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                  <span style={{fontSize:12,color:"#94a3b8"}}>1 km</span>
-                  <span style={{fontSize:15,fontWeight:800,color:"#1d6fb8",fontFamily:"'Lora',serif"}}>{distance} km</span>
-                  <span style={{fontSize:12,color:"#94a3b8"}}>100 km</span>
-                </div>
-                <input type="range" min={1} max={100} step={1} value={distance} onChange={e=>setDistance(Number(e.target.value))} style={{width:"100%",accentColor:"#1d6fb8",height:6,cursor:"pointer"}}/>
-                <div className="range-btns">
-                  {[1,10,25,50,100].map(d=>(
-                    <button key={d} type="button" onClick={()=>setDistance(d)}
-                      style={{fontSize:11,fontWeight:600,padding:"3px 7px",borderRadius:6,border:`1.5px solid ${distance===d?"#1d6fb8":"#e2e8f0"}`,background:distance===d?"#eff6ff":"#f8fafc",color:distance===d?"#1d6fb8":"#94a3b8",cursor:"pointer",transition:"all .2s"}}>
-                      {d}km
-                    </button>
-                  ))}
-                </div>
+            {/* Contact phones — revealed to donor only after accept */}
+            <div className="card fu" style={{background:"#f0f7ff",border:"1.5px solid #bfdbfe",display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{fontSize:14,fontWeight:700,fontFamily:"'Lora',serif",color:"#1d4ed8",display:"flex",alignItems:"center",gap:6}}>
+                📞 Contact Numbers for Donors
               </div>
-              <div style={{background:"linear-gradient(135deg,#eff6ff,#f0fdfa)",border:"1.5px solid #bfdbfe",borderRadius:10,padding:"11px 14px"}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                  <div>
-                    <div style={{fontSize:10.5,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".5px"}}>Est. donors to notify</div>
-                    <div style={{fontSize:24,fontWeight:800,color:"#1d6fb8",fontFamily:"'Lora',serif",marginTop:2}}>{bloodGroup?estimatedDonors:"—"}</div>
-                    {bloodGroup?<div style={{fontSize:11,color:"#64748b",marginTop:1}}>with <strong>{bloodGroup}</strong> within <strong>{distance} km</strong></div>:<div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>Select a blood group to estimate</div>}
-                  </div>
-                  <div style={{fontSize:32,opacity:.7}}>👥</div>
-                </div>
+              <div style={{fontSize:11.5,color:"#64748b",marginTop:-6,lineHeight:1.5}}>
+                These numbers will only be shown to a donor <strong>after they accept</strong> this request.
+              </div>
+              <div>
+                <label style={lbl}>Primary Contact Number <span style={{color:"#dc2626"}}>*</span></label>
+                <input className="inp-plain" placeholder="e.g. 9876543210" maxLength={15} value={contactPhone1}
+                  onChange={e=>{setContactPhone1(e.target.value.replace(/[^0-9+\-\s]/g,""));setErrors(er=>({...er,contactPhone1:""}));}}/>
+                {errors.contactPhone1&&<p style={{fontSize:11.5,color:"#dc2626",marginTop:4}}>⚠ {errors.contactPhone1}</p>}
+              </div>
+              <div>
+                <label style={lbl}>Secondary Contact Number (optional)</label>
+                <input className="inp-plain" placeholder="e.g. 9876543211" maxLength={15} value={contactPhone2}
+                  onChange={e=>setContactPhone2(e.target.value.replace(/[^0-9+\-\s]/g,""))}/>
               </div>
             </div>
+
           </div>
         </div>
 
@@ -1240,9 +1108,8 @@ function BloodRequestPage(){
               {bloodGroup
                 ?<><div style={{fontSize:13,fontWeight:600,color:"#1a2332"}}>Ready to broadcast <span style={{color:"#1d6fb8"}}>{bloodGroup}</span>{patientName&&<> for <span style={{color:"#1d6fb8"}}>{patientName}</span></>}</div>
                   <div style={{fontSize:11.5,color:"#94a3b8",marginTop:2}}>
-                    {units} unit{units>1?"s":""} · <span style={{fontWeight:600,color:urgencyColor[urgency]}}>{urgency.charAt(0).toUpperCase()+urgency.slice(1)}</span> · {distance} km
+                    {units} unit{units>1?"s":""} · <span style={{fontWeight:600,color:urgencyColor[urgency]}}>{urgency.charAt(0).toUpperCase()+urgency.slice(1)}</span>
                     · <span style={{color:"#0f766e",fontWeight:600}}>{donorsNeeded} donors to accept</span>
-                    · ~<strong style={{color:"#1d6fb8"}}>{estimatedDonors}</strong> notified
                   </div></>
                 :<div style={{fontSize:13,color:"#94a3b8"}}>Fill in the details above to send a blood request broadcast</div>}
             </div>
@@ -1322,7 +1189,6 @@ function BloodRequestPage(){
                     <div style={{fontSize:11.5,color:"#64748b",display:"flex",flexWrap:"wrap",gap:8}}>
                       <span>🩸 {r.blood} · {r.units} unit{r.units>1?"s":""}</span>
                       <span>👥 {r.donorsNeeded} donors needed</span>
-                      <span>📡 {r.distance} km</span>
                       <span>📅 {r.date ? (() => { const dt = new Date(r.date); return dt.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) + ", " + dt.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true}); })() : "—"}</span>
                       {r.notes&&<span>📝 {r.notes}</span>}
                       <span style={{color:"#7c3aed",fontWeight:600}}>🔺 Escalation level {r.escalation}</span>
@@ -1517,9 +1383,7 @@ export default function HospitalDashboard(){
             {page==="dashboard" && <DashboardPage setPage={navigate}/>}
             {page==="profile"   && <ProfilePage/>}
             {page==="broadcast" && <BloodRequestPage/>}
-            {page==="facility"  && <FacilityPage/>}
             {page==="contact"   && <ContactPage/>}
-            {page==="hours"     && <HoursPage/>}
             {page==="settings"  && <SettingsPage/>}
           </main>
         </div>

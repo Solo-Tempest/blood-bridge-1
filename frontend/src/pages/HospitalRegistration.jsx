@@ -556,36 +556,6 @@ function Step4({ d, set, errors }) {
         )}
       </div>
 
-      {/* Operating hours */}
-      <div>
-        <label className={lbl}>Operating Hours</label>
-        <div className="flex items-center gap-3 mb-3 bg-rose-50 border border-rose-100 rounded-xl px-4 py-3 cursor-pointer"
-          onClick={() => set({ ...d, is24x7: !d.is24x7 })}>
-          <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200
-            ${d.is24x7 ? "bg-red-600 border-red-600" : "border-gray-300"}`}>
-            {d.is24x7 && <span className="text-white text-[10px] font-black">✓</span>}
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-gray-700">24 × 7 Operations</p>
-            <p className="text-[11px] text-gray-500">Hospital / blood bank is available round the clock</p>
-          </div>
-        </div>
-        {!d.is24x7 && (
-          <div className="grid grid-cols-2 gap-4 fade-up">
-            <Field label="Opening Time" error={errors.openTime}>
-              <Li>🕐</Li>
-              <input type="time" className={inp(errors.openTime)} value={d.openTime||""}
-                onChange={e => set({ ...d, openTime: e.target.value })} />
-            </Field>
-            <Field label="Closing Time" error={errors.closeTime}>
-              <Li>🕐</Li>
-              <input type="time" className={inp(errors.closeTime)} value={d.closeTime||""}
-                onChange={e => set({ ...d, closeTime: e.target.value })} />
-            </Field>
-          </div>
-        )}
-      </div>
-
       {/* Beds */}
       <div className="grid grid-cols-2 gap-4">
         <Field label="Total Beds (approx.)">

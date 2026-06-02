@@ -91,7 +91,6 @@ export async function getHospitalProfile(token) {
     ...data,
     contact:  data.contactName,
     role:     data.contactRole,
-    is24x7:   data.open24x7,
   };
 }
 
@@ -233,9 +232,6 @@ export async function hospitalRegister(fd) {
     email:       fd.contact.email,
     hasBloodBank: fd.facilities.hasBloodBank,
     bbLicense:   fd.facilities.bbLicense,
-    open24x7:    fd.facilities.is24x7,
-    openTime:    fd.facilities.openTime,
-    closeTime:   fd.facilities.closeTime,
     beds:        fd.facilities.beds ? Number(fd.facilities.beds) : null,
     icuBeds:     fd.facilities.icuBeds ? Number(fd.facilities.icuBeds) : null,
     password:    fd.account.password,

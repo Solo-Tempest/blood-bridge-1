@@ -20,7 +20,6 @@ public class BloodRequestCreateRequest {
     @NotBlank(message = "Urgency level is required")
     private String urgency;
 
-    @NotNull @Min(1)
     private Integer distanceKm;
 
     @NotBlank(message = "Patient name is required")

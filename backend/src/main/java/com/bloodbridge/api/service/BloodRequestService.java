@@ -64,7 +64,7 @@ public class BloodRequestService {
                 .units(req.getUnits())
                 .donorsNeeded(req.getDonorsNeeded())
                 .urgency(urgency)
-                .distanceKm(req.getDistanceKm())
+                .distanceKm(req.getDistanceKm() != null ? req.getDistanceKm() : 0)
                 .patientName(req.getPatientName())
                 .notes(req.getNotes())
                 .contactPhone1(req.getContactPhone1())
@@ -109,7 +109,11 @@ public class BloodRequestService {
         final Double hLat = rawLat, hLng = rawLng;
 
         return donorNotificationRepository.findByBloodRequestIdWithDonors(request.getId())
-                .stream().map(n -> toDonorResponse(n, hLat, hLng)).toList();
+                .stream()
+                .map(n -> toDonorResponse(n, hLat, hLng))
+                .sorted(java.util.Comparator.comparingDouble(
+                        r -> r.getDistanceKm() != null ? r.getDistanceKm() : Double.MAX_VALUE))
+                .toList();
     }
 
     private RequestDonorResponse toDonorResponse(DonorNotification n, Double hLat, Double hLng) {
