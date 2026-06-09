@@ -111,8 +111,11 @@ public class BloodRequestService {
         return donorNotificationRepository.findByBloodRequestIdWithDonors(request.getId())
                 .stream()
                 .map(n -> toDonorResponse(n, hLat, hLng))
-                .sorted(java.util.Comparator.comparingDouble(
-                        r -> r.getDistanceKm() != null ? r.getDistanceKm() : Double.MAX_VALUE))
+                .sorted(java.util.Comparator
+                        .comparingDouble((RequestDonorResponse r) ->
+                                r.getMlScore() != null ? -r.getMlScore() : Double.MAX_VALUE)
+                        .thenComparingDouble(r ->
+                                r.getDistanceKm() != null ? r.getDistanceKm() : Double.MAX_VALUE))
                 .toList();
     }
 
@@ -137,6 +140,7 @@ public class BloodRequestService {
                 .status(n.getStatus().name())
                 .sentAt(n.getSentAt())
                 .respondedAt(n.getRespondedAt())
+                .mlScore(n.getMlScore())
                 .phone(accepted ? donor.getUser().getPhone() : null)
                 .weight(accepted ? donor.getWeight() : null)
                 .dateOfBirth(accepted ? donor.getDateOfBirth() : null)

@@ -8,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -51,13 +53,21 @@ public class EscalationService {
             if (newLevel > request.getEscalationLevel()) {
                 request.setEscalationLevel(newLevel);
                 bloodRequestRepository.save(request);
-                donorMatchingService.matchAndNotify(request.getId());
-                log.info("Request {} escalated: level {} → {} (age {}min, urgency {}, radius {})",
-                        request.getId(),
-                        newLevel - 1, newLevel,
-                        minutesOld,
-                        request.getUrgency(),
-                        newLevel >= 3 ? "citywide" : (newLevel == 2 ? "20km" : "5km"));
+                final Long requestId = request.getId();
+                final int escalatedTo = newLevel;
+                final long age = minutesOld;
+                final UrgencyLevel urgency = request.getUrgency();
+                // Schedule matchAndNotify AFTER this transaction commits so the async
+                // thread reads the updated escalation level from the DB (not the old one).
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        log.info("Request {} escalated: level {} → {} (age {}min, urgency {}, radius {})",
+                                requestId, escalatedTo - 1, escalatedTo, age, urgency,
+                                escalatedTo >= 3 ? "citywide" : (escalatedTo == 2 ? "20km" : "5km"));
+                        donorMatchingService.matchAndNotify(requestId);
+                    }
+                });
             }
         }
     }

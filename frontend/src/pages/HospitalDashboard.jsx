@@ -644,6 +644,14 @@ function RequestDetailView({ request: r, donors, loading, error, onBack }){
     PENDING: { label:"Pending",  bg:"#fef9c3", color:"#a16207", border:"#fde68a" },
   };
 
+  // Build rank map: sort all donors by mlScore desc, assign rank 1,2,3...
+  const hasMlScores = donors.some(d => d.mlScore != null);
+  const allByScore  = hasMlScores
+    ? [...donors].sort((a,b) => (b.mlScore||0) - (a.mlScore||0))
+    : [];
+  const rankMap = {};
+  allByScore.forEach((d,i) => { rankMap[d.notificationId] = i + 1; });
+
   return(
     <div style={{display:"flex",flexDirection:"column",gap:18}} className="fu">
 
@@ -687,6 +695,32 @@ function RequestDetailView({ request: r, donors, loading, error, onBack }){
         </div>
       </div>
 
+      {/* ── ML Ranking info banner ── */}
+      {hasMlScores&&(
+        <div style={{background:"linear-gradient(135deg,#eff6ff,#f0fdf4)",border:"1.5px solid #93c5fd",borderRadius:12,padding:"12px 16px",display:"flex",flexWrap:"wrap",gap:10,alignItems:"center"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:200}}>
+            <span style={{fontSize:20}}>🤖</span>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:"#1d4ed8"}}>Donors ranked by AI · Random Forest (AUC 0.876)</div>
+              <div style={{fontSize:11.5,color:"#475569",marginTop:2}}>
+                Score = Blood Match × P(Show Up) × Proximity &nbsp;·&nbsp; Higher score → notified first
+              </div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {[
+              {label:"Blood Match",desc:"How closely blood types match (1.0 = exact)"},
+              {label:"P(Show Up)",desc:"ML-predicted chance the donor will respond"},
+              {label:"Proximity",desc:"How close the donor is to the hospital"},
+            ].map(f=>(
+              <div key={f.label} style={{background:"#fff",border:"1px solid #bfdbfe",borderRadius:8,padding:"5px 10px",fontSize:11,fontWeight:600,color:"#1d4ed8",cursor:"default"}} title={f.desc}>
+                {f.label}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Loading / error ── */}
       {loading&&(
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -723,7 +757,10 @@ function RequestDetailView({ request: r, donors, loading, error, onBack }){
                       <div style={{fontSize:11.5,color:"#64748b",marginTop:2}}>{d.city}{d.state?`, ${d.state}`:""}</div>
                     </div>
                   </div>
-                  <span style={{background:"#dcfce7",color:"#15803d",border:"1px solid #86efac",borderRadius:999,padding:"3px 11px",fontSize:11.5,fontWeight:700}}>✓ Accepted</span>
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+                    <span style={{background:"#dcfce7",color:"#15803d",border:"1px solid #86efac",borderRadius:999,padding:"3px 11px",fontSize:11.5,fontWeight:700}}>✓ Accepted</span>
+                    {rankMap[d.notificationId]&&<span style={{background:"#dbeafe",color:"#1d4ed8",border:"1px solid #93c5fd",borderRadius:999,padding:"2px 8px",fontSize:10.5,fontWeight:700}}>🤖 Rank #{rankMap[d.notificationId]}{d.mlScore!=null?` · ${(d.mlScore*100).toFixed(0)}%`:""}</span>}
+                  </div>
                 </div>
 
                 {/* Stats grid */}
@@ -776,15 +813,29 @@ function RequestDetailView({ request: r, donors, loading, error, onBack }){
           <div style={{background:"#fff",borderRadius:14,border:"1.5px solid #e8edf5",overflow:"hidden"}}>
             {others.map((d,i)=>{
               const st=statusStyle[d.status]||statusStyle.PENDING;
+              const rank=rankMap[d.notificationId];
+              const scorePct=d.mlScore!=null?Math.round(d.mlScore*100):null;
               return(
-                <div key={d.notificationId} style={{padding:"12px 16px",borderBottom:i<others.length-1?"1px solid #f1f5f9":"none",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                <div key={d.notificationId} style={{padding:"12px 16px",borderBottom:i<others.length-1?"1px solid #f1f5f9":"none",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                  {/* Rank badge */}
+                  {rank&&<div style={{width:28,height:28,background:rank===1?"linear-gradient(135deg,#1d4ed8,#3b82f6)":rank===2?"linear-gradient(135deg,#6366f1,#818cf8)":rank===3?"linear-gradient(135deg,#7c3aed,#a78bfa)":"linear-gradient(135deg,#64748b,#94a3b8)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:10,flexShrink:0,letterSpacing:"-0.5px"}}>#{rank}</div>}
                   <div style={{width:36,height:36,background:"linear-gradient(135deg,#e2e8f0,#f1f5f9)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:12,color:"#475569",flexShrink:0}}>
                     {BLOOD_DISPLAY_H[d.bloodGroup]||d.bloodGroup}
                   </div>
-                  <div style={{flex:1,minWidth:120}}>
+                  <div style={{flex:1,minWidth:110}}>
                     <div style={{fontSize:13,fontWeight:600,color:"#1a2332"}}>{d.name}</div>
                     <div style={{fontSize:11.5,color:"#94a3b8",marginTop:1}}>{d.city}{d.state?`, ${d.state}`:""} {d.distanceKm!=null?`· ~${d.distanceKm} km`:""}</div>
                   </div>
+                  {/* ML score bar */}
+                  {scorePct!=null&&(
+                    <div style={{display:"flex",flexDirection:"column",gap:2,minWidth:80,flexShrink:0}}>
+                      <div style={{fontSize:10,fontWeight:700,color:"#64748b",textAlign:"right"}}>AI Score</div>
+                      <div style={{height:6,background:"#e2e8f0",borderRadius:4,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${scorePct}%`,background:scorePct>=70?"#22c55e":scorePct>=45?"#f59e0b":"#ef4444",borderRadius:4,transition:"width .4s"}}/>
+                      </div>
+                      <div style={{fontSize:10.5,fontWeight:700,color:scorePct>=70?"#15803d":scorePct>=45?"#a16207":"#dc2626",textAlign:"right"}}>{scorePct}%</div>
+                    </div>
+                  )}
                   <span style={{background:st.bg,color:st.color,border:`1px solid ${st.border}`,borderRadius:999,padding:"3px 10px",fontSize:11.5,fontWeight:700,flexShrink:0}}>{st.label}</span>
                   <div style={{fontSize:11,color:"#94a3b8",textAlign:"right",flexShrink:0}}>
                     <div>Sent: {fmtDT(d.sentAt)}</div>
@@ -968,7 +1019,8 @@ function BloodRequestPage(){
               <div style={{fontSize:32,flexShrink:0}}>✅</div>
               <div>
                 <div style={{fontSize:14,fontWeight:700,color:"#15803d",marginBottom:3}}>Blood request sent successfully!</div>
-                <div style={{fontSize:12.5,color:"#166534"}}><strong>{sentCount} donors</strong> have been notified.</div>
+                <div style={{fontSize:12.5,color:"#166534",marginBottom:4}}>Donor matching is running in the background.</div>
+                <div style={{fontSize:12,color:"#166534"}}>Go to <strong>History → click the request</strong> in a few seconds to see notified donors.</div>
                 <button onClick={()=>setSent(false)} className="btn-ghost" style={{marginTop:8,padding:"5px 12px",fontSize:12}}>Send another</button>
               </div>
             </div>

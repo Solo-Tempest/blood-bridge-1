@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +29,7 @@ public class DonorMatchingService {
     private final DonorNotificationRepository notificationRepository;
     private final BloodRequestRepository bloodRequestRepository;
     private final SmsService emailService;
+    private final MlRankingService mlRankingService;
 
     // Which donor blood groups can donate to a given requested blood group
     private static final Map<BloodGroup, List<BloodGroup>> COMPATIBLE_DONORS = new EnumMap<>(BloodGroup.class);
@@ -75,17 +77,26 @@ public class DonorMatchingService {
                 }
             }
 
+            // ML ranking: reorder eligible in-radius donors by predicted show-up probability
+            LinkedHashMap<Donor, Double> mlRanked = mlRankingService.rankWithScores(
+                    new ArrayList<>(matchedWithDist.keySet()), request, matchedWithDist
+            );
+
             String bloodGroupDisplay = formatBloodGroup(request.getBloodGroup());
 
             int created = 0;
-            for (Map.Entry<Donor, Double> entry : matchedWithDist.entrySet()) {
-                Donor donor = entry.getKey();
-                double dist = entry.getValue();
+            for (Map.Entry<Donor, Double> mlEntry : mlRanked.entrySet()) {
+                Donor donor = mlEntry.getKey();
+                Double mlScore = mlEntry.getValue();
+                double dist = matchedWithDist.get(donor);
                 if (!notificationRepository.existsByDonorAndBloodRequest(donor, request)) {
+                    String token = UUID.randomUUID().toString();
                     notificationRepository.save(DonorNotification.builder()
                             .donor(donor)
                             .bloodRequest(request)
                             .status(NotificationStatus.PENDING)
+                            .mlScore(mlScore)
+                            .responseToken(token)
                             .build());
                     emailService.sendBloodRequestNotification(
                             donor.getUser().getEmail(),
@@ -94,7 +105,8 @@ public class DonorMatchingService {
                             request.getUnits(),
                             request.getUrgency(),
                             hospital.getCity(),
-                            dist
+                            dist,
+                            token
                     );
                     created++;
                 }

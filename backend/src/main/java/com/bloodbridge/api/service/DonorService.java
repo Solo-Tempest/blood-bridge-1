@@ -9,6 +9,7 @@ import com.bloodbridge.api.entity.DonorNotification;
 import com.bloodbridge.api.entity.Hospital;
 import com.bloodbridge.api.entity.User;
 import com.bloodbridge.api.entity.enums.NotificationStatus;
+import com.bloodbridge.api.entity.enums.RequestStatus;
 import com.bloodbridge.api.exception.ApiException;
 import com.bloodbridge.api.repository.BloodRequestRepository;
 import com.bloodbridge.api.repository.DonorNotificationRepository;
@@ -120,6 +121,33 @@ public class DonorService {
         bloodRequestRepository.save(request);
 
         return toNotificationResponse(notif);
+    }
+
+    public enum TokenRespondResult { ACCEPTED, DECLINED, ALREADY_RESPONDED, INVALID, REQUEST_CLOSED }
+
+    @Transactional
+    public TokenRespondResult respondByToken(String token, String action) {
+        DonorNotification notif = notificationRepository.findByResponseToken(token).orElse(null);
+        if (notif == null) return TokenRespondResult.INVALID;
+        if (notif.getStatus() != NotificationStatus.PENDING) return TokenRespondResult.ALREADY_RESPONDED;
+
+        BloodRequest request = notif.getBloodRequest();
+        if (request.getStatus() != RequestStatus.ACTIVE) return TokenRespondResult.REQUEST_CLOSED;
+
+        boolean accepted = "ACCEPT".equalsIgnoreCase(action);
+        notif.setStatus(accepted ? NotificationStatus.ACCEPTED : NotificationStatus.DECLINED);
+        notif.setRespondedAt(LocalDateTime.now());
+        notificationRepository.save(notif);
+
+        if (accepted) {
+            request.setAccepted(request.getAccepted() + 1);
+        } else {
+            request.setDeclined(request.getDeclined() + 1);
+        }
+        request.setPending(Math.max(0, request.getPending() - 1));
+        bloodRequestRepository.save(request);
+
+        return accepted ? TokenRespondResult.ACCEPTED : TokenRespondResult.DECLINED;
     }
 
     private DonorNotificationResponse toNotificationResponse(DonorNotification n) {

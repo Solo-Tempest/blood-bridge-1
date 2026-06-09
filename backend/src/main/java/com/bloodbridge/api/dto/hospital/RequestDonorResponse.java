@@ -25,6 +25,9 @@ public class RequestDonorResponse {
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime respondedAt;
 
+    // ML ranking score — always visible so hospital can see ranking proof
+    private Double mlScore;
+
     // Revealed only for ACCEPTED donors
     private String phone;
     private Double weight;

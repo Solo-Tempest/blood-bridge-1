@@ -37,6 +37,12 @@ public class DonorNotification {
     @Column(name = "responded_at")
     private LocalDateTime respondedAt;
 
+    @Column(name = "ml_score")
+    private Double mlScore;
+
+    @Column(name = "response_token", unique = true)
+    private String responseToken;
+
     @PrePersist
     protected void onCreate() {
         sentAt = LocalDateTime.now();

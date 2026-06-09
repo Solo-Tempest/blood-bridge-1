@@ -20,6 +20,9 @@ public class SmsService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
+    @Value("${app.base-url:http://localhost:8080}")
+    private String baseUrl;
+
     @Async
     public void sendOtp(String toEmail, String otp) {
         try {
@@ -40,7 +43,7 @@ public class SmsService {
     public void sendBloodRequestNotification(String toEmail, String donorName,
                                               String bloodGroup, int units,
                                               UrgencyLevel urgency, String hospitalCity,
-                                              double distanceKm) {
+                                              double distanceKm, String responseToken) {
         try {
             MimeMessage msg = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(msg, false, "UTF-8");
@@ -50,7 +53,7 @@ public class SmsService {
                     ? "CRITICAL: " + bloodGroup + " blood needed urgently near you!"
                     : "Blood Request: " + bloodGroup + " blood needed near you";
             helper.setSubject(subject);
-            helper.setText(buildNotificationEmailBody(donorName, bloodGroup, units, urgency, hospitalCity, distanceKm), true);
+            helper.setText(buildNotificationEmailBody(donorName, bloodGroup, units, urgency, hospitalCity, distanceKm, responseToken), true);
             mailSender.send(msg);
             log.info("Blood request notification sent to {}", toEmail);
         } catch (Exception e) {
@@ -60,7 +63,7 @@ public class SmsService {
 
     private String buildNotificationEmailBody(String donorName, String bloodGroup, int units,
                                                UrgencyLevel urgency, String hospitalCity,
-                                               double distanceKm) {
+                                               double distanceKm, String responseToken) {
         String urgencyColor = switch (urgency) {
             case CRITICAL -> "#dc2626";
             case URGENT   -> "#ea580c";
@@ -105,10 +108,24 @@ public class SmsService {
                 </table>
               </div>
               <div style="text-align:center;margin-bottom:24px;">
-                <p style="color:#374151;font-size:14px;margin:0 0 8px;font-weight:600;">
-                  Log in to Blood Bridge to accept or decline this request.
+                <p style="color:#374151;font-size:14px;margin:0 0 16px;font-weight:600;">
+                  Respond directly from this email — no login required.
                 </p>
-                <p style="color:#9ca3af;font-size:12px;margin:0;">
+                <div style="text-align:center;">
+                  <a href="%s/api/donor/respond?token=%s&action=ACCEPT"
+                     style="background:#16a34a;color:#fff;padding:12px 0;border-radius:9px;
+                            font-size:14px;font-weight:700;text-decoration:none;display:inline-block;
+                            width:140px;text-align:center;margin-right:32px;">
+                    Accept
+                  </a>
+                  <a href="%s/api/donor/respond?token=%s&action=DECLINE"
+                     style="background:#dc2626;color:#fff;padding:12px 0;border-radius:9px;
+                            font-size:14px;font-weight:700;text-decoration:none;display:inline-block;
+                            width:140px;text-align:center;">
+                    Decline
+                  </a>
+                </div>
+                <p style="color:#9ca3af;font-size:12px;margin:16px 0 0;">
                   Hospital name and contact details are revealed only after you accept.
                 </p>
               </div>
@@ -117,7 +134,8 @@ public class SmsService {
                 To stop receiving these alerts, set yourself as unavailable in your donor profile.
               </p>
             </div>
-            """.formatted(urgencyColor, urgencyLabel, donorName, bloodGroup, units, hospitalCity, distanceKm);
+            """.formatted(urgencyColor, urgencyLabel, donorName, bloodGroup, units, hospitalCity, distanceKm,
+                    baseUrl, responseToken, baseUrl, responseToken);
     }
 
     private String buildEmailBody(String otp) {
