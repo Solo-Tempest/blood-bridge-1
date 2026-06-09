@@ -1,0 +1,24 @@
+{
+  "features": [
+    "donor_age",
+    "donor_gender_M",
+    "distance_km",
+    "days_since_last_donation",
+    "is_new_donor",
+    "total_past_donations",
+    "blood_match_level",
+    "availability_flag",
+    "urgency_NORMAL",
+    "urgency_URGENT",
+    "urgency_CRITICAL",
+    "hour_of_day",
+    "day_of_week",
+    "is_weekend",
+    "is_evening"
+  ],
+  "best_model": "Random Forest",
+  "scaler_used": false,
+  "auc": 0.8759893110144652,
+  "cv_auc_mean": 0.8683691433806688,
+  "cv_auc_std": 0.003984100809955288
+}
